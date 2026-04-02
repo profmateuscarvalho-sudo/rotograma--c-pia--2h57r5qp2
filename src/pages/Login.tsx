@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import pb from '@/lib/pocketbase/client'
+import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Login() {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,7 +19,9 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     try {
-      await pb.collection('users').authWithPassword(email, password)
+      const { error } = await signIn(email, password)
+      if (error) throw error
+
       toast({ title: 'Login realizado com sucesso' })
       navigate('/')
     } catch (err: any) {
