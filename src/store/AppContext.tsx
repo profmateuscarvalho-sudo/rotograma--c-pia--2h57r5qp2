@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { AppState, RiskEvent, RiskType, Route, Segment, Observation } from '@/types'
 import { DEFAULT_CATALOG } from '@/lib/constants'
-import pb from '@/lib/pocketbase/client'
+import { useCallback } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
+import { useRealtime } from '@/hooks/use-realtime'
 
 interface AppContextType {
   state: AppState
@@ -17,7 +20,7 @@ interface AppContextType {
   updateCatalogRisk: (id: string, updates: Partial<RiskType>) => void
   removeCatalogRisk: (id: string) => void
   addObservation: (observation: Observation) => void
-  markAsSynced: (eventIds: string[]) => void
+  markAsSynced: (type: 'routes' | 'segments' | 'events' | 'observations', ids: string[]) => void
   clearData: () => void
 }
 
@@ -49,6 +52,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return initialState
   })
 
+  const { user } = useAuth()
+
+  const fetchRemoteData = useCallback(async () => {
+    if (!user) return
+    try {
+      const [routesRes, segmentsRes, eventsRes, obsRes] = await Promise.all([
+        supabase.from('routes').select('*'),
+        supabase.from('segments').select('*'),
+        supabase.from('events').select('*'),
+        supabase.from('observations').select('*'),
+      ])
+
+      if (!routesRes.error && !segmentsRes.error && !eventsRes.error && !obsRes.error) {
+        const remoteRoutes = routesRes.data.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          origin: r.origin,
+          destination: r.destination,
+          evaluator: r.evaluator,
+          date: r.date,
+          status: r.status,
+          synced: true,
+        }))
+        const remoteSegments = segmentsRes.data.map((s: any) => ({
+          id: s.id,
+          routeId: s.route_id,
+          number: s.number,
+          startKm: s.start_km,
+          endKm: s.end_km,
+          synced: true,
+        }))
+        const remoteEvents = eventsRes.data.map((e: any) => ({
+          id: e.id,
+          routeId: e.route_id,
+          segmentId: e.segment_id,
+          riskTypeId: e.risk_type_id,
+          timestamp: e.timestamp,
+          note: e.note,
+          photoUrl: e.photo_url,
+          audioUrl: e.audio_url,
+          videoTimestamp: e.video_timestamp,
+          synced: true,
+        }))
+        const remoteObs = obsRes.data.map((o: any) => ({
+          id: o.id,
+          routeId: o.route_id,
+          segmentId: o.segment_id,
+          note: o.note,
+          audioUrl: o.audio_url,
+          videoTimestamp: o.video_timestamp,
+          timestamp: o.timestamp,
+          synced: true,
+        }))
+
+        setState((prev) => {
+          const merge = (local: any[], remote: any[]) => {
+            const localMap = new Map(local.map((i) => [i.id, i]))
+            remote.forEach((r) => {
+              const l = localMap.get(r.id)
+              if (!l || l.synced !== false) localMap.set(r.id, r)
+            })
+            return Array.from(localMap.values())
+          }
+          return {
+            ...prev,
+            routes: merge(prev.routes, remoteRoutes),
+            segments: merge(prev.segments, remoteSegments),
+            events: merge(prev.events, remoteEvents),
+            observations: merge(prev.observations || [], remoteObs),
+          }
+        })
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (user) fetchRemoteData()
+  }, [user, fetchRemoteData])
+
+  useRealtime('routes', fetchRemoteData, !!user)
+  useRealtime('segments', fetchRemoteData, !!user)
+  useRealtime('events', fetchRemoteData, !!user)
+  useRealtime('observations', fetchRemoteData, !!user)
+
   useEffect(() => {
     localStorage.setItem('rotograma_state', JSON.stringify(state))
   }, [state])
@@ -56,8 +145,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addRoute = (route: Route, segments: Segment[]) => {
     setState((prev) => ({
       ...prev,
-      routes: [route, ...prev.routes],
-      segments: [...prev.segments, ...segments],
+      routes: [{ ...route, synced: false }, ...prev.routes],
+      segments: [...prev.segments, ...segments.map((s) => ({ ...s, synced: false }))],
     }))
   }
 
@@ -69,10 +158,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       events: prev.events.filter((e) => e.routeId !== id),
       observations: prev.observations?.filter((o) => o.routeId !== id) || [],
     }))
+    if (user) supabase.from('routes').delete().eq('id', id).then()
   }
 
   const addEvent = (event: RiskEvent) => {
-    setState((prev) => ({ ...prev, events: [...prev.events, event] }))
+    setState((prev) => ({ ...prev, events: [...prev.events, { ...event, synced: false }] }))
   }
 
   const updateEvent = (id: string, updates: Partial<RiskEvent>) => {
@@ -84,19 +174,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const removeEvent = (id: string) => {
     setState((prev) => ({ ...prev, events: prev.events.filter((e) => e.id !== id) }))
+    if (user) supabase.from('events').delete().eq('id', id).then()
   }
 
   const updateSegment = (id: string, updates: Partial<Segment>) => {
     setState((prev) => ({
       ...prev,
-      segments: prev.segments.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+      segments: prev.segments.map((s) => (s.id === id ? { ...s, ...updates, synced: false } : s)),
     }))
   }
 
   const completeRoute = (id: string) => {
     setState((prev) => ({
       ...prev,
-      routes: prev.routes.map((r) => (r.id === id ? { ...r, status: 'concluido' } : r)),
+      routes: prev.routes.map((r) =>
+        r.id === id ? { ...r, status: 'concluido', synced: false } : r,
+      ),
     }))
   }
 
@@ -122,45 +215,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }))
   }
 
-  const addObservation = async (observation: Observation) => {
+  const addObservation = (observation: Observation) => {
     setState((prev) => ({
       ...prev,
-      observations: [...(prev.observations || []), observation],
+      observations: [...(prev.observations || []), { ...observation, synced: false }],
     }))
+  }
 
-    try {
-      if (pb.authStore.isValid) {
-        const formData = new FormData()
-        const routeRecord = await pb
-          .collection('routes')
-          .getFirstListItem(`id="${observation.routeId}"`)
-          .catch(() => null)
-
-        if (routeRecord) {
-          formData.append('route_id', routeRecord.id)
-          formData.append('note', observation.note)
-          if (observation.videoTimestamp) {
-            formData.append('video_timestamp', observation.videoTimestamp)
-          }
-          if (observation.audioUrl && observation.audioUrl.startsWith('blob:')) {
-            const response = await fetch(observation.audioUrl)
-            const blob = await response.blob()
-            formData.append('audio', blob, 'audio.webm')
-          }
-          await pb.collection('route_observations').create(formData)
+  const markAsSynced = useCallback(
+    (type: 'routes' | 'segments' | 'events' | 'observations', ids: string[]) => {
+      setState((prev) => {
+        const updated = { ...prev }
+        if (type === 'routes') {
+          updated.routes = prev.routes.map((r) => (ids.includes(r.id) ? { ...r, synced: true } : r))
+        } else if (type === 'segments') {
+          updated.segments = prev.segments.map((s) =>
+            ids.includes(s.id) ? { ...s, synced: true } : s,
+          )
+        } else if (type === 'events') {
+          updated.events = prev.events.map((e) => (ids.includes(e.id) ? { ...e, synced: true } : e))
+        } else if (type === 'observations') {
+          updated.observations = (prev.observations || []).map((o) =>
+            ids.includes(o.id) ? { ...o, synced: true } : o,
+          )
         }
-      }
-    } catch (err) {
-      console.error('Failed to sync observation to backend', err)
-    }
-  }
-
-  const markAsSynced = (eventIds: string[]) => {
-    setState((prev) => ({
-      ...prev,
-      events: prev.events.map((e) => (eventIds.includes(e.id) ? { ...e, synced: true } : e)),
-    }))
-  }
+        return updated
+      })
+    },
+    [],
+  )
 
   const clearData = () => {
     setState(initialState)

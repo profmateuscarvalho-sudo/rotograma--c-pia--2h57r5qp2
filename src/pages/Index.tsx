@@ -4,7 +4,16 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Route as RouteIcon, AlertTriangle, FileText, CheckCircle, Trash2 } from 'lucide-react'
+import {
+  Route as RouteIcon,
+  AlertTriangle,
+  FileText,
+  CheckCircle,
+  Trash2,
+  CloudUpload,
+  WifiOff,
+} from 'lucide-react'
+import { useSync } from '@/hooks/useSync'
 import {
   calculateSegmentScore,
   getRiskLevel,
@@ -29,6 +38,7 @@ import { toast } from '@/hooks/use-toast'
 export default function Index() {
   const navigate = useNavigate()
   const { state, removeRoute } = useAppStore()
+  const { isSyncing, isOnline, pendingCount } = useSync()
   const { routes, segments, events, catalog } = state
 
   const totalRoutes = routes.length
@@ -57,7 +67,31 @@ export default function Index() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+            {!isOnline && (
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <WifiOff className="w-3 h-3" /> Offline
+              </Badge>
+            )}
+            {isOnline && pendingCount > 0 && (
+              <Badge
+                variant="secondary"
+                className="flex items-center gap-1 bg-amber-100 text-amber-800 hover:bg-amber-100"
+              >
+                <CloudUpload className={`w-3 h-3 ${isSyncing ? 'animate-bounce' : ''}`} />
+                {isSyncing ? 'Sincronizando...' : `${pendingCount} pendentes`}
+              </Badge>
+            )}
+            {isOnline && pendingCount === 0 && (
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-emerald-600 border-emerald-200"
+              >
+                <CheckCircle className="w-3 h-3" /> Sincronizado
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">Visão geral dos levantamentos viários.</p>
         </div>
         <Button asChild className="hidden md:flex gap-2">
