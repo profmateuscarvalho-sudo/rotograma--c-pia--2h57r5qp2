@@ -50,14 +50,8 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file && photoUrls.length < 5) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoUrls((prev) => [...prev, reader.result as string])
-      }
-      reader.onerror = () => {
-        toast({ title: 'Erro ao processar imagem', variant: 'destructive' })
-      }
-      reader.readAsDataURL(file)
+      const url = URL.createObjectURL(file)
+      setPhotoUrls((prev) => [...prev, url])
     }
   }
 
@@ -82,14 +76,8 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
         recorder.onstop = () => {
           try {
             const blob = new Blob(chunks, { type: 'audio/webm' })
-            const reader = new FileReader()
-            reader.onloadend = () => {
-              setAudioUrl(reader.result as string)
-            }
-            reader.onerror = () => {
-              toast({ title: 'Erro ao processar áudio', variant: 'destructive' })
-            }
-            reader.readAsDataURL(blob)
+            const url = URL.createObjectURL(blob)
+            setAudioUrl(url)
             stream.getTracks().forEach((t) => t.stop())
           } catch (e) {
             console.error('Error processing audio', e)

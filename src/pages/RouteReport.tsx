@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -36,7 +37,8 @@ import { RiskLevelLegend } from '@/components/RiskLevelLegend'
 
 export default function RouteReport() {
   const { id } = useParams()
-  const { state } = useAppStore()
+  const { state, updateEvent } = useAppStore() as any
+  const { user } = useAuth()
   const [uploadingId, setUploadingId] = useState<string | null>(null)
 
   const handleAddPhoto = async (event: RiskEvent, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,11 +55,16 @@ export default function RouteReport() {
       return
     }
 
+    if (!user) {
+      toast.error('Usuário não autenticado.')
+      return
+    }
+
     setUploadingId(event.id)
     try {
       const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
-      const filePath = `${event.routeId}/${event.id}/${fileName}`
+      const fileName = `${event.id}_photo_${Date.now()}.${fileExt}`
+      const filePath = `${user.id}/events/${fileName}`
 
       const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file)
       if (uploadError) throw uploadError
@@ -74,6 +81,12 @@ export default function RouteReport() {
         .eq('id', event.id)
 
       if (updateError) throw updateError
+
+      if (updateEvent) {
+        updateEvent(event.id, { photoUrls: newPhotoUrls })
+      } else {
+        event.photoUrls = newPhotoUrls
+      }
 
       toast.success('Foto adicionada com sucesso!')
     } catch (err) {
@@ -100,6 +113,12 @@ export default function RouteReport() {
         .eq('id', event.id)
 
       if (updateError) throw updateError
+
+      if (updateEvent) {
+        updateEvent(event.id, { photoUrls: newPhotoUrls })
+      } else {
+        event.photoUrls = newPhotoUrls
+      }
 
       toast.success('Foto removida com sucesso!')
     } catch (err) {
