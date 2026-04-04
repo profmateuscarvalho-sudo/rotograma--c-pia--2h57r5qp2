@@ -80,22 +80,30 @@ export const useSync = () => {
           let photoUrl = event.photoUrl
           let audioUrl = event.audioUrl
 
-          if (photoUrl?.startsWith('data:image')) {
-            const res = await fetch(photoUrl)
-            const blob = await res.blob()
-            const path = `${user.id}/events/${event.id}_photo.jpg`
-            await supabase.storage.from('media').upload(path, blob, { upsert: true })
-            const { data } = supabase.storage.from('media').getPublicUrl(path)
-            photoUrl = data.publicUrl
+          if (photoUrl?.startsWith('data:image') || photoUrl?.startsWith('blob:')) {
+            try {
+              const res = await fetch(photoUrl)
+              const blob = await res.blob()
+              const path = `${user.id}/events/${event.id}_photo.jpg`
+              await supabase.storage.from('media').upload(path, blob, { upsert: true })
+              const { data } = supabase.storage.from('media').getPublicUrl(path)
+              photoUrl = data.publicUrl
+            } catch (e) {
+              console.error('Failed to upload photo', e)
+            }
           }
 
-          if (audioUrl?.startsWith('blob:')) {
-            const res = await fetch(audioUrl)
-            const blob = await res.blob()
-            const path = `${user.id}/events/${event.id}_audio.webm`
-            await supabase.storage.from('media').upload(path, blob, { upsert: true })
-            const { data } = supabase.storage.from('media').getPublicUrl(path)
-            audioUrl = data.publicUrl
+          if (audioUrl?.startsWith('blob:') || audioUrl?.startsWith('data:')) {
+            try {
+              const res = await fetch(audioUrl)
+              const blob = await res.blob()
+              const path = `${user.id}/events/${event.id}_audio.webm`
+              await supabase.storage.from('media').upload(path, blob, { upsert: true })
+              const { data } = supabase.storage.from('media').getPublicUrl(path)
+              audioUrl = data.publicUrl
+            } catch (e) {
+              console.error('Failed to upload audio', e)
+            }
           }
 
           const { error } = await supabase.from('events').upsert({
@@ -116,13 +124,17 @@ export const useSync = () => {
         for (const obs of pendingObservations) {
           let audioUrl = obs.audioUrl
 
-          if (audioUrl?.startsWith('blob:')) {
-            const res = await fetch(audioUrl)
-            const blob = await res.blob()
-            const path = `${user.id}/observations/${obs.id}_audio.webm`
-            await supabase.storage.from('media').upload(path, blob, { upsert: true })
-            const { data } = supabase.storage.from('media').getPublicUrl(path)
-            audioUrl = data.publicUrl
+          if (audioUrl?.startsWith('blob:') || audioUrl?.startsWith('data:')) {
+            try {
+              const res = await fetch(audioUrl)
+              const blob = await res.blob()
+              const path = `${user.id}/observations/${obs.id}_audio.webm`
+              await supabase.storage.from('media').upload(path, blob, { upsert: true })
+              const { data } = supabase.storage.from('media').getPublicUrl(path)
+              audioUrl = data.publicUrl
+            } catch (e) {
+              console.error('Failed to upload obs audio', e)
+            }
           }
 
           const { error } = await supabase.from('observations').upsert({

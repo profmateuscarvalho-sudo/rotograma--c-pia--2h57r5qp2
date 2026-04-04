@@ -17,7 +17,17 @@ import {
   Square,
   FileText,
   Video,
+  Edit,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { RiskType, RiskEvent } from '@/types'
 import { getRiskLevel, getRiskColor } from '@/lib/risk-utils'
@@ -26,7 +36,8 @@ import { cn } from '@/lib/utils'
 export default function FieldOperation() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { state, addEvent, removeEvent, completeRoute, addObservation } = useAppStore()
+  const { state, addEvent, removeEvent, completeRoute, addObservation, updateRoute } =
+    useAppStore() as any
   const { toast } = useToast()
 
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0)
@@ -59,12 +70,43 @@ export default function FieldOperation() {
   const segmentLevel = getRiskLevel(currentSegmentScore)
   const segmentLevelColor = getRiskColor(segmentLevel)
 
+  const [isEditRouteOpen, setIsEditRouteOpen] = useState(false)
+  const [editRouteData, setEditRouteData] = useState({
+    name: '',
+    origin: '',
+    destination: '',
+    evaluator: '',
+  })
+
   useEffect(() => {
     if (!route) navigate('/')
     if (route?.status === 'concluido') navigate(`/routes/${id}/report`)
+    if (route) {
+      setEditRouteData({
+        name: route.name,
+        origin: route.origin,
+        destination: route.destination,
+        evaluator: route.evaluator,
+      })
+    }
   }, [route, navigate, id])
 
   if (!route || !currentSegment) return null
+
+  const handleUpdateRoute = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (updateRoute) {
+      updateRoute(route.id, { ...editRouteData, synced: false })
+    } else {
+      route.name = editRouteData.name
+      route.origin = editRouteData.origin
+      route.destination = editRouteData.destination
+      route.evaluator = editRouteData.evaluator
+      ;(route as any).synced = false
+    }
+    setIsEditRouteOpen(false)
+    toast({ title: 'Rota atualizada com sucesso' })
+  }
 
   const handleLogRisk = (risk: RiskType) => {
     if (navigator.vibrate) navigator.vibrate(50)
@@ -205,10 +247,82 @@ export default function FieldOperation() {
             >
               <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
             </Button>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 flex items-baseline gap-2">
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-lg font-black tracking-tight text-slate-900 leading-none">
+                {route.name}
+              </h1>
+              <Dialog open={isEditRouteOpen} onOpenChange={setIsEditRouteOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-slate-400 hover:text-blue-600"
+                  >
+                    <Edit className="w-3 h-3" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Editar Rota</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleUpdateRoute} className="space-y-4 mt-2">
+                    <div className="space-y-2">
+                      <Label>Nome da Rota</Label>
+                      <Input
+                        value={editRouteData.name}
+                        onChange={(e) =>
+                          setEditRouteData({ ...editRouteData, name: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Origem</Label>
+                        <Input
+                          value={editRouteData.origin}
+                          onChange={(e) =>
+                            setEditRouteData({ ...editRouteData, origin: e.target.value })
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Destino</Label>
+                        <Input
+                          value={editRouteData.destination}
+                          onChange={(e) =>
+                            setEditRouteData({ ...editRouteData, destination: e.target.value })
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Avaliador</Label>
+                      <Input
+                        value={editRouteData.evaluator}
+                        onChange={(e) =>
+                          setEditRouteData({ ...editRouteData, evaluator: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full">
+                      Salvar Alterações
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <p className="text-xs font-semibold text-slate-600 mb-3 bg-slate-100 w-fit px-2 py-0.5 rounded-md">
+              {route.origin} → {route.destination}
+            </p>
+
+            <h2 className="text-base font-bold text-slate-800 flex items-baseline gap-2">
               Trecho {currentSegment.number}
-              <span className="text-sm text-slate-400 font-medium">/ {segments.length}</span>
-            </h1>
+              <span className="text-xs text-slate-400 font-medium">/ {segments.length}</span>
+            </h2>
             <p className="text-xs font-medium text-slate-500">
               KM {currentSegment.startKm} ao KM {currentSegment.endKm}
             </p>

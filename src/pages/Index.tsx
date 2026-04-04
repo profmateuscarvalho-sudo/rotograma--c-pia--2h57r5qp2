@@ -12,7 +12,18 @@ import {
   Trash2,
   CloudUpload,
   WifiOff,
+  Edit,
 } from 'lucide-react'
+import { useState } from 'react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useSync } from '@/hooks/useSync'
 import {
   calculateSegmentScore,
@@ -37,7 +48,31 @@ import { toast } from '@/hooks/use-toast'
 
 export default function Index() {
   const navigate = useNavigate()
-  const { state, removeRoute } = useAppStore()
+  const { state, removeRoute, updateRoute } = useAppStore() as any
+  const [editingRoute, setEditingRoute] = useState<any>(null)
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    origin: '',
+    destination: '',
+    evaluator: '',
+  })
+
+  const handleEditRouteSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (editingRoute) {
+      if (updateRoute) {
+        updateRoute(editingRoute.id, { ...editFormData, synced: false })
+      } else {
+        editingRoute.name = editFormData.name
+        editingRoute.origin = editFormData.origin
+        editingRoute.destination = editFormData.destination
+        editingRoute.evaluator = editFormData.evaluator
+        editingRoute.synced = false
+      }
+      setEditingRoute(null)
+      toast({ title: 'Rota atualizada com sucesso!' })
+    }
+  }
   const { isSyncing, isOnline, pendingCount } = useSync()
   const { routes, segments, events, catalog } = state
 
@@ -140,6 +175,55 @@ export default function Index() {
         </Card>
       </div>
 
+      <Dialog open={!!editingRoute} onOpenChange={(open) => !open && setEditingRoute(null)}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Editar Rota</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditRouteSubmit} className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label>Nome da Rota</Label>
+              <Input
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Origem</Label>
+                <Input
+                  value={editFormData.origin}
+                  onChange={(e) => setEditFormData({ ...editFormData, origin: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Destino</Label>
+                <Input
+                  value={editFormData.destination}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, destination: e.target.value })
+                  }
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Avaliador</Label>
+              <Input
+                value={editFormData.evaluator}
+                onChange={(e) => setEditFormData({ ...editFormData, evaluator: e.target.value })}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full">
+              Salvar Alterações
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <div className="mt-8">
         <h3 className="text-xl font-semibold mb-4">Minhas Rotas</h3>
         {routes.length === 0 ? (
@@ -219,6 +303,24 @@ export default function Index() {
                             <CheckCircle className="w-3 h-3" /> Concluído
                           </Badge>
                         )}
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingRoute(route)
+                            setEditFormData({
+                              name: route.name,
+                              origin: route.origin,
+                              destination: route.destination,
+                              evaluator: route.evaluator,
+                            })
+                          }}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
 
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

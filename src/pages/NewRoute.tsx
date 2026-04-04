@@ -15,29 +15,39 @@ export default function NewRoute() {
     origin: '',
     destination: '',
     evaluator: '',
-    kmPerSegment: '10',
+    totalKm: '100',
+    segmentCount: '10',
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const routeId = crypto.randomUUID()
-    const km = parseFloat(formData.kmPerSegment) || 10
+    const totalKm = parseFloat(formData.totalKm) || 100
+    const count = parseInt(formData.segmentCount) || 10
+    const kmPerSegment = totalKm / count
 
     const newRoute: Route = {
       id: routeId,
-      ...formData,
-      kmPerSegment: km,
+      name: formData.name,
+      origin: formData.origin,
+      destination: formData.destination,
+      evaluator: formData.evaluator,
+      kmPerSegment,
       status: 'em_andamento',
       date: new Date().toISOString(),
     }
 
-    const segments: Segment[] = Array.from({ length: 10 }).map((_, i) => ({
-      id: crypto.randomUUID(),
-      routeId,
-      number: i + 1,
-      startKm: i * km,
-      endKm: (i + 1) * km,
-    }))
+    const segments: Segment[] = Array.from({ length: count }).map(
+      (_, i) =>
+        ({
+          id: crypto.randomUUID(),
+          routeId,
+          number: i + 1,
+          startKm: Number((i * kmPerSegment).toFixed(2)),
+          endKm: Number(((i + 1) * kmPerSegment).toFixed(2)),
+          synced: false,
+        }) as any,
+    )
 
     addRoute(newRoute, segments)
     navigate(`/routes/${routeId}/field`)
@@ -99,22 +109,42 @@ export default function NewRoute() {
               />
             </div>
 
-            <div className="space-y-2 pb-4">
-              <Label htmlFor="kmPerSegment">KM por Trecho</Label>
-              <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 gap-4 pb-4">
+              <div className="space-y-2">
+                <Label htmlFor="totalKm">KM Total da Rota</Label>
                 <Input
-                  id="kmPerSegment"
+                  id="totalKm"
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  required
+                  value={formData.totalKm}
+                  onChange={(e) => setFormData({ ...formData, totalKm: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="segmentCount">Qtd. de Trechos</Label>
+                <Input
+                  id="segmentCount"
                   type="number"
                   min="1"
                   required
-                  value={formData.kmPerSegment}
-                  onChange={(e) => setFormData({ ...formData, kmPerSegment: e.target.value })}
-                  className="w-32"
+                  value={formData.segmentCount}
+                  onChange={(e) => setFormData({ ...formData, segmentCount: e.target.value })}
                 />
-                <span className="text-sm text-muted-foreground">
-                  Serão gerados 10 trechos automaticamente.
-                </span>
               </div>
+            </div>
+            <div className="text-sm text-muted-foreground bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">
+              O sistema gerará automaticamente{' '}
+              <strong className="text-slate-800">{formData.segmentCount || 0} trechos</strong> com
+              aproximadamente{' '}
+              <strong className="text-slate-800">
+                {(
+                  (parseFloat(formData.totalKm) || 0) / (parseInt(formData.segmentCount) || 1)
+                ).toFixed(2)}{' '}
+                km
+              </strong>{' '}
+              cada.
             </div>
 
             <Button type="submit" className="w-full h-12 text-lg">
