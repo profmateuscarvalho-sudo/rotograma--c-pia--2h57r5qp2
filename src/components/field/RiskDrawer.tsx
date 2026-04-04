@@ -38,10 +38,21 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
   useEffect(() => {
     if (event) {
       setNote(event.note || '')
-      setPhotoUrls(
-        event.photoUrls?.length ? event.photoUrls : event.photoUrl ? [event.photoUrl] : [],
-      )
-      setAudioUrl(event.audioUrl || '')
+
+      let initialPhotos: string[] = []
+      if (Array.isArray(event.photoUrls) && event.photoUrls.length > 0) {
+        initialPhotos = event.photoUrls
+      } else if (Array.isArray((event as any).photo_urls) && (event as any).photo_urls.length > 0) {
+        initialPhotos = (event as any).photo_urls
+      } else {
+        const url = event.photoUrl || (event as any).photo_url
+        if (url && typeof url === 'string') {
+          initialPhotos = url.split(',').filter(Boolean)
+        }
+      }
+
+      setPhotoUrls(initialPhotos)
+      setAudioUrl(event.audioUrl || (event as any).audio_url || '')
     } else {
       setNote('')
       setPhotoUrls([])
@@ -117,17 +128,18 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
 
   const handleSave = () => {
     if (eventId) {
+      const joinedPhotos = photoUrls.join(',')
       if (updateEvent) {
         updateEvent(eventId, {
           note,
-          photoUrl: photoUrls[0] || '',
+          photoUrl: joinedPhotos,
           photoUrls,
           audioUrl,
           synced: false,
         })
       } else if (event) {
         event.note = note
-        event.photoUrl = photoUrls[0] || ''
+        event.photoUrl = joinedPhotos
         event.photoUrls = photoUrls
         event.audioUrl = audioUrl
         event.synced = false

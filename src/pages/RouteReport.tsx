@@ -46,11 +46,18 @@ export default function RouteReport() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    const currentPhotos = event.photoUrls?.length
-      ? event.photoUrls
-      : event.photoUrl
-        ? [event.photoUrl]
-        : []
+    let currentPhotos: string[] = []
+    if (Array.isArray(event.photoUrls) && event.photoUrls.length > 0) {
+      currentPhotos = event.photoUrls
+    } else if (Array.isArray((event as any).photo_urls) && (event as any).photo_urls.length > 0) {
+      currentPhotos = (event as any).photo_urls
+    } else {
+      const url = event.photoUrl || (event as any).photo_url
+      if (url && typeof url === 'string') {
+        currentPhotos = url.split(',').filter(Boolean)
+      }
+    }
+
     if (currentPhotos.length >= 5) {
       toast.error('Limite máximo de 5 fotos atingido.')
       return
@@ -66,10 +73,12 @@ export default function RouteReport() {
       const key = `photo_${Date.now()}_${Math.random().toString(36).substring(7)}`
       await saveMedia(key, file)
       const newPhotoUrls = [...currentPhotos, `idb://${key}`]
+      const joinedPhotos = newPhotoUrls.join(',')
 
       if (updateEvent) {
-        updateEvent(event.id, { photoUrls: newPhotoUrls, synced: false })
+        updateEvent(event.id, { photoUrl: joinedPhotos, photoUrls: newPhotoUrls, synced: false })
       } else {
+        event.photoUrl = joinedPhotos
         event.photoUrls = newPhotoUrls
         event.synced = false
       }
@@ -84,20 +93,28 @@ export default function RouteReport() {
   }
 
   const removePhoto = async (event: RiskEvent, photoUrlToRemove: string) => {
-    const currentPhotos = event.photoUrls?.length
-      ? event.photoUrls
-      : event.photoUrl
-        ? [event.photoUrl]
-        : []
+    let currentPhotos: string[] = []
+    if (Array.isArray(event.photoUrls) && event.photoUrls.length > 0) {
+      currentPhotos = event.photoUrls
+    } else if (Array.isArray((event as any).photo_urls) && (event as any).photo_urls.length > 0) {
+      currentPhotos = (event as any).photo_urls
+    } else {
+      const url = event.photoUrl || (event as any).photo_url
+      if (url && typeof url === 'string') {
+        currentPhotos = url.split(',').filter(Boolean)
+      }
+    }
     const newPhotoUrls = currentPhotos.filter((url) => url !== photoUrlToRemove)
+    const joinedPhotos = newPhotoUrls.join(',')
 
     try {
       if (photoUrlToRemove.startsWith('idb://')) {
         await deleteMedia(photoUrlToRemove.replace('idb://', ''))
       }
       if (updateEvent) {
-        updateEvent(event.id, { photoUrls: newPhotoUrls, synced: false })
+        updateEvent(event.id, { photoUrl: joinedPhotos, photoUrls: newPhotoUrls, synced: false })
       } else {
+        event.photoUrl = joinedPhotos
         event.photoUrls = newPhotoUrls
         event.synced = false
       }
@@ -395,11 +412,23 @@ export default function RouteReport() {
                                   </div>
                                 )}
                                 {(() => {
-                                  const photos = event.photoUrls?.length
-                                    ? event.photoUrls
-                                    : event.photoUrl
-                                      ? [event.photoUrl]
-                                      : []
+                                  let photos: string[] = []
+                                  if (
+                                    Array.isArray(event.photoUrls) &&
+                                    event.photoUrls.length > 0
+                                  ) {
+                                    photos = event.photoUrls
+                                  } else if (
+                                    Array.isArray((event as any).photo_urls) &&
+                                    (event as any).photo_urls.length > 0
+                                  ) {
+                                    photos = (event as any).photo_urls
+                                  } else {
+                                    const url = event.photoUrl || (event as any).photo_url
+                                    if (url && typeof url === 'string') {
+                                      photos = url.split(',').filter(Boolean)
+                                    }
+                                  }
 
                                   return (
                                     <div className="mt-4">

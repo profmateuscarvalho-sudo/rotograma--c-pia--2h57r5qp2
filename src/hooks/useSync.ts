@@ -78,9 +78,21 @@ export const useSync = () => {
         }
 
         for (const event of pendingEvents) {
-          let photoUrl = event.photoUrl
-          let photoUrls = event.photoUrls || (photoUrl ? [photoUrl] : [])
-          let audioUrl = event.audioUrl
+          let rawPhotoUrl = event.photoUrl || (event as any).photo_url
+          let photoUrls: string[] = []
+
+          if (Array.isArray(event.photoUrls) && event.photoUrls.length > 0) {
+            photoUrls = event.photoUrls
+          } else if (
+            Array.isArray((event as any).photo_urls) &&
+            (event as any).photo_urls.length > 0
+          ) {
+            photoUrls = (event as any).photo_urls
+          } else if (rawPhotoUrl && typeof rawPhotoUrl === 'string') {
+            photoUrls = rawPhotoUrl.split(',').filter(Boolean)
+          }
+
+          let audioUrl = event.audioUrl || (event as any).audio_url
 
           const syncedPhotoUrls: string[] = []
 
@@ -125,7 +137,7 @@ export const useSync = () => {
             }
           }
 
-          photoUrl = syncedPhotoUrls[0] || null
+          const finalPhotoUrl = syncedPhotoUrls[0] || null
 
           if (audioUrl?.startsWith('idb://')) {
             try {
@@ -168,7 +180,7 @@ export const useSync = () => {
             risk_type_id: event.riskTypeId,
             timestamp: event.timestamp,
             note: event.note || null,
-            photo_url: photoUrl || null,
+            photo_url: finalPhotoUrl,
             photo_urls: syncedPhotoUrls,
             audio_url: audioUrl || null,
             video_timestamp: event.videoTimestamp || null,
@@ -177,7 +189,7 @@ export const useSync = () => {
             syncedEvents.push(event.id)
             if (updateEvent) {
               updateEvent(event.id, {
-                photoUrl: photoUrl || undefined,
+                photoUrl: syncedPhotoUrls.join(',') || undefined,
                 photoUrls: syncedPhotoUrls,
                 audioUrl: audioUrl || undefined,
                 synced: true,
