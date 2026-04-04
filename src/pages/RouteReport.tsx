@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAppStore } from '@/store/AppContext'
-import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { saveMedia, deleteMedia } from '@/lib/idb'
+import { IdbImage, IdbAudio } from '@/components/ui/idb-media'
 import {
   calculateSegmentScore,
   getRiskLevel,
@@ -62,26 +63,22 @@ export default function RouteReport() {
 
     setUploadingId(event.id)
     try {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const base64Url = reader.result as string
-        const newPhotoUrls = [...currentPhotos, base64Url]
+      const key = `photo_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      await saveMedia(key, file)
+      const newPhotoUrls = [...currentPhotos, `idb://${key}`]
 
-        if (updateEvent) {
-          updateEvent(event.id, { photoUrls: newPhotoUrls, synced: false })
-        } else {
-          event.photoUrls = newPhotoUrls
-          event.synced = false
-        }
-        toast.success('Foto adicionada! Será sincronizada quando houver conexão.')
-        setUploadingId(null)
+      if (updateEvent) {
+        updateEvent(event.id, { photoUrls: newPhotoUrls, synced: false })
+      } else {
+        event.photoUrls = newPhotoUrls
+        event.synced = false
       }
-      reader.readAsDataURL(file)
+      toast.success('Foto adicionada! Será sincronizada quando houver conexão.')
     } catch (err) {
       console.error(err)
       toast.error('Erro ao processar a foto.')
-      setUploadingId(null)
     } finally {
+      setUploadingId(null)
       e.target.value = ''
     }
   }
@@ -95,6 +92,9 @@ export default function RouteReport() {
     const newPhotoUrls = currentPhotos.filter((url) => url !== photoUrlToRemove)
 
     try {
+      if (photoUrlToRemove.startsWith('idb://')) {
+        await deleteMedia(photoUrlToRemove.replace('idb://', ''))
+      }
       if (updateEvent) {
         updateEvent(event.id, { photoUrls: newPhotoUrls, synced: false })
       } else {
@@ -108,23 +108,23 @@ export default function RouteReport() {
     }
   }
 
-  const route = state.routes.find((r) => r.id === id)
+  const route = state.routes.find((r: any) => r.id === id)
   const segments = state.segments
-    .filter((s) => s.routeId === id)
-    .sort((a, b) => a.number - b.number)
+    .filter((s: any) => s.routeId === id)
+    .sort((a: any, b: any) => a.number - b.number)
   const events = state.events
-    .filter((e) => e.routeId === id)
-    .sort((a, b) => a.timestamp - b.timestamp)
+    .filter((e: any) => e.routeId === id)
+    .sort((a: any, b: any) => a.timestamp - b.timestamp)
 
   if (!route) return <div className="p-8 text-center">Rota não encontrada.</div>
 
-  const segmentScores = segments.map((segment) => {
+  const segmentScores = segments.map((segment: any) => {
     const score = calculateSegmentScore(segment.id, events, state.catalog)
     return { ...segment, score, level: getRiskLevel(score) }
   })
 
-  const totalRouteWeight = events.reduce((acc, e) => {
-    const risk = state.catalog.find((r) => r.id === e.riskTypeId)
+  const totalRouteWeight = events.reduce((acc: number, e: any) => {
+    const risk = state.catalog.find((r: any) => r.id === e.riskTypeId)
     return acc + (risk ? risk.baseWeight : 0)
   }, 0)
 
@@ -201,7 +201,6 @@ export default function RouteReport() {
           </div>
         </div>
 
-        {/* Prominent Severity Summary block for PDF and UI */}
         <div className="mb-8 print:break-inside-avoid">
           <div
             className={cn(
@@ -252,7 +251,7 @@ export default function RouteReport() {
               Scoreboard Visual (Trechos 1 a {segments.length})
             </h3>
             <div className="flex h-12 w-full rounded-lg overflow-hidden ring-1 ring-slate-200">
-              {segmentScores.map((seg) => (
+              {segmentScores.map((seg: any) => (
                 <div
                   key={seg.id}
                   className="flex-1 flex items-center justify-center transition-opacity hover:opacity-80 cursor-pointer"
@@ -267,19 +266,20 @@ export default function RouteReport() {
         </Card>
 
         <div className="space-y-8">
-          {segmentScores.map((seg) => {
-            const segEvents = events.filter((e) => e.segmentId === seg.id)
-            const segObservations = state.observations?.filter((o) => o.segmentId === seg.id) || []
+          {segmentScores.map((seg: any) => {
+            const segEvents = events.filter((e: any) => e.segmentId === seg.id)
+            const segObservations =
+              state.observations?.filter((o: any) => o.segmentId === seg.id) || []
 
             if (segEvents.length === 0 && segObservations.length === 0) return null
 
             const groupedEvents = Object.values(
               segEvents.reduce(
-                (acc, event) => {
+                (acc: any, event: any) => {
                   if (!acc[event.riskTypeId]) {
                     acc[event.riskTypeId] = {
                       events: [],
-                      risk: state.catalog.find((r) => r.id === event.riskTypeId)!,
+                      risk: state.catalog.find((r: any) => r.id === event.riskTypeId)!,
                     }
                   }
                   acc[event.riskTypeId].events.push(event)
@@ -315,7 +315,7 @@ export default function RouteReport() {
                 </h3>
 
                 <div className="border border-t-0 border-slate-200 rounded-b-lg p-4 space-y-6 print:border-x-0 print:border-b print:rounded-none print:pt-4">
-                  {groupedEvents.map((group) => {
+                  {groupedEvents.map((group: any) => {
                     const { risk, events: groupEvents } = group
                     if (!risk) return null
                     const groupWeightSum = groupEvents.length * risk.baseWeight
@@ -354,7 +354,7 @@ export default function RouteReport() {
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {groupEvents.map((event) => (
+                            {groupEvents.map((event: any) => (
                               <div
                                 key={event.id}
                                 className="bg-slate-50 rounded-md p-3 border border-slate-100 print:border-slate-200 flex flex-col"
@@ -382,7 +382,11 @@ export default function RouteReport() {
                                 )}
                                 {event.audioUrl && (
                                   <div className="mb-3 print:hidden">
-                                    <audio src={event.audioUrl} controls className="h-10 w-full" />
+                                    <IdbAudio
+                                      src={event.audioUrl}
+                                      controls
+                                      className="h-10 w-full"
+                                    />
                                   </div>
                                 )}
                                 {event.audioUrl && (
@@ -401,12 +405,12 @@ export default function RouteReport() {
                                     <div className="mt-4">
                                       {photos.length > 0 && (
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-2 print:grid-cols-3">
-                                          {photos.map((url, i) => (
+                                          {photos.map((url: string, i: number) => (
                                             <div
                                               key={i}
                                               className="relative group aspect-square bg-slate-100 rounded-md overflow-hidden border border-slate-200 print:aspect-[4/3]"
                                             >
-                                              <img
+                                              <IdbImage
                                                 src={url}
                                                 alt={`Evidência ${i + 1}`}
                                                 className="object-cover w-full h-full"
@@ -481,7 +485,7 @@ export default function RouteReport() {
                         <FileText className="w-4 h-4" /> Observações e Marcadores do Trecho
                       </h4>
                       <div className="space-y-3">
-                        {segObservations.map((obs) => (
+                        {segObservations.map((obs: any) => (
                           <div key={obs.id} className="text-sm flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-xs font-bold text-blue-600 print:text-slate-500">
@@ -509,7 +513,7 @@ export default function RouteReport() {
                             )}
                             {obs.audioUrl && (
                               <div className="mt-2 print:hidden">
-                                <audio
+                                <IdbAudio
                                   src={obs.audioUrl}
                                   controls
                                   className="h-10 w-full max-w-sm"

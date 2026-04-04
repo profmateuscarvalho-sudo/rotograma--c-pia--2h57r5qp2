@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Camera, Mic, Square, Trash2, Save } from 'lucide-react'
 import { useAppStore } from '@/store/AppContext'
 import { useToast } from '@/hooks/use-toast'
+import { saveMedia, deleteMedia } from '@/lib/idb'
+import { IdbImage, IdbAudio } from '@/components/ui/idb-media'
 
 interface RiskDrawerProps {
   eventId: string | null
@@ -47,18 +49,29 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
     }
   }, [event])
 
-  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file && photoUrls.length < 5) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoUrls((prev) => [...prev, reader.result as string])
+      try {
+        const key = `photo_${Date.now()}_${Math.random().toString(36).substring(7)}`
+        await saveMedia(key, file)
+        setPhotoUrls((prev) => [...prev, `idb://${key}`])
+      } catch (err) {
+        console.error(err)
+        toast({ title: 'Erro ao salvar foto localmente', variant: 'destructive' })
       }
-      reader.readAsDataURL(file)
     }
   }
 
-  const removePhoto = (index: number) => {
+  const removePhoto = async (index: number) => {
+    const url = photoUrls[index]
+    if (url?.startsWith('idb://')) {
+      try {
+        await deleteMedia(url.replace('idb://', ''))
+      } catch (err) {
+        console.error(err)
+      }
+    }
     setPhotoUrls((prev) => prev.filter((_, i) => i !== index))
   }
 
@@ -72,21 +85,25 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
       setIsRecording(false)
     } else {
       try {
+        if (audioUrl?.startsWith('idb://')) {
+          deleteMedia(audioUrl.replace('idb://', '')).catch(console.error)
+        }
+        setAudioUrl('')
+
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         const recorder = new MediaRecorder(stream)
         const chunks: Blob[] = []
         recorder.ondataavailable = (e) => chunks.push(e.data)
-        recorder.onstop = () => {
+        recorder.onstop = async () => {
           try {
             const blob = new Blob(chunks, { type: 'audio/webm' })
-            const reader = new FileReader()
-            reader.onloadend = () => {
-              setAudioUrl(reader.result as string)
-            }
-            reader.readAsDataURL(blob)
+            const key = `audio_${Date.now()}_${Math.random().toString(36).substring(7)}`
+            await saveMedia(key, blob)
+            setAudioUrl(`idb://${key}`)
             stream.getTracks().forEach((t) => t.stop())
           } catch (e) {
             console.error('Error processing audio', e)
+            toast({ title: 'Erro ao salvar áudio', variant: 'destructive' })
           }
         }
         recorder.start()
@@ -184,7 +201,7 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
                   key={i}
                   className="relative rounded-lg overflow-hidden border border-slate-200 aspect-square"
                 >
-                  <img
+                  <IdbImage
                     src={url}
                     alt={`Evidência ${i + 1}`}
                     className="w-full h-full object-cover"
@@ -204,12 +221,17 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
 
           {audioUrl && !isRecording && (
             <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-              <audio src={audioUrl} controls className="flex-1 h-8" />
+              <IdbAudio src={audioUrl} controls className="flex-1 h-8" />
               <Button
                 variant="ghost"
                 size="icon"
                 className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 shrink-0"
-                onClick={() => setAudioUrl('')}
+                onClick={() => {
+                  if (audioUrl.startsWith('idb://')) {
+                    deleteMedia(audioUrl.replace('idb://', '')).catch(console.error)
+                  }
+                  setAudioUrl('')
+                }}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>

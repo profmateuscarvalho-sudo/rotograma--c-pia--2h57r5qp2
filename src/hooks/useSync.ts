@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useAppStore } from '@/store/AppContext'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
+import { getMedia, deleteMedia } from '@/lib/idb'
 
 export const useSync = () => {
   const { state, markAsSynced, updateEvent, updateObservation } = useAppStore() as any
@@ -85,7 +86,29 @@ export const useSync = () => {
 
           for (let i = 0; i < photoUrls.length; i++) {
             let pUrl = photoUrls[i]
-            if (pUrl?.startsWith('data:image') || pUrl?.startsWith('blob:')) {
+            if (pUrl?.startsWith('idb://')) {
+              try {
+                const key = pUrl.replace('idb://', '')
+                const data = await getMedia(key)
+                let blob: Blob
+                if (data instanceof Blob) {
+                  blob = data
+                } else if (typeof data === 'string' && data.startsWith('data:image')) {
+                  blob = await (await fetch(data)).blob()
+                } else {
+                  syncedPhotoUrls.push(pUrl)
+                  continue
+                }
+                const path = `${user.id}/events/${event.id}_photo_${i}_${Date.now()}.jpg`
+                await supabase.storage.from('media').upload(path, blob, { upsert: true })
+                const { data: pubData } = supabase.storage.from('media').getPublicUrl(path)
+                syncedPhotoUrls.push(pubData.publicUrl)
+                await deleteMedia(key)
+              } catch (e) {
+                console.error('Failed to upload IDB photo', e)
+                syncedPhotoUrls.push(pUrl)
+              }
+            } else if (pUrl?.startsWith('data:image') || pUrl?.startsWith('blob:')) {
               try {
                 const res = await fetch(pUrl)
                 const blob = await res.blob()
@@ -104,11 +127,31 @@ export const useSync = () => {
 
           photoUrl = syncedPhotoUrls[0] || null
 
-          if (audioUrl?.startsWith('blob:') || audioUrl?.startsWith('data:')) {
+          if (audioUrl?.startsWith('idb://')) {
+            try {
+              const key = audioUrl.replace('idb://', '')
+              const data = await getMedia(key)
+              let blob: Blob
+              if (data instanceof Blob) {
+                blob = data
+              } else if (typeof data === 'string' && data.startsWith('data:')) {
+                blob = await (await fetch(data)).blob()
+              } else {
+                blob = new Blob([]) // fallback
+              }
+              const path = `${user.id}/events/${event.id}_audio_${Date.now()}.webm`
+              await supabase.storage.from('media').upload(path, blob, { upsert: true })
+              const { data: pubData } = supabase.storage.from('media').getPublicUrl(path)
+              audioUrl = pubData.publicUrl
+              await deleteMedia(key)
+            } catch (e) {
+              console.error('Failed to upload IDB audio', e)
+            }
+          } else if (audioUrl?.startsWith('blob:') || audioUrl?.startsWith('data:')) {
             try {
               const res = await fetch(audioUrl)
               const blob = await res.blob()
-              const path = `${user.id}/events/${event.id}_audio.webm`
+              const path = `${user.id}/events/${event.id}_audio_${Date.now()}.webm`
               await supabase.storage.from('media').upload(path, blob, { upsert: true })
               const { data } = supabase.storage.from('media').getPublicUrl(path)
               audioUrl = data.publicUrl
@@ -146,11 +189,31 @@ export const useSync = () => {
         for (const obs of pendingObservations) {
           let audioUrl = obs.audioUrl
 
-          if (audioUrl?.startsWith('blob:') || audioUrl?.startsWith('data:')) {
+          if (audioUrl?.startsWith('idb://')) {
+            try {
+              const key = audioUrl.replace('idb://', '')
+              const data = await getMedia(key)
+              let blob: Blob
+              if (data instanceof Blob) {
+                blob = data
+              } else if (typeof data === 'string' && data.startsWith('data:')) {
+                blob = await (await fetch(data)).blob()
+              } else {
+                blob = new Blob([])
+              }
+              const path = `${user.id}/observations/${obs.id}_audio_${Date.now()}.webm`
+              await supabase.storage.from('media').upload(path, blob, { upsert: true })
+              const { data: pubData } = supabase.storage.from('media').getPublicUrl(path)
+              audioUrl = pubData.publicUrl
+              await deleteMedia(key)
+            } catch (e) {
+              console.error('Failed to upload obs IDB audio', e)
+            }
+          } else if (audioUrl?.startsWith('blob:') || audioUrl?.startsWith('data:')) {
             try {
               const res = await fetch(audioUrl)
               const blob = await res.blob()
-              const path = `${user.id}/observations/${obs.id}_audio.webm`
+              const path = `${user.id}/observations/${obs.id}_audio_${Date.now()}.webm`
               await supabase.storage.from('media').upload(path, blob, { upsert: true })
               const { data } = supabase.storage.from('media').getPublicUrl(path)
               audioUrl = data.publicUrl
