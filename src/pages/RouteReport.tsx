@@ -1,6 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAppStore } from '@/store/AppContext'
+import { supabase } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +17,18 @@ import {
   getRouteRiskDescription,
   getRiskWeightLevelName,
 } from '@/lib/risk-utils'
-import { ArrowLeft, MapPin, Printer, Mic, FileText, Video, ShieldAlert } from 'lucide-react'
+import {
+  ArrowLeft,
+  MapPin,
+  Printer,
+  Mic,
+  FileText,
+  Video,
+  ShieldAlert,
+  X,
+  ImagePlus,
+  Loader2,
+} from 'lucide-react'
 import { IconRenderer } from '@/components/icons'
 import { RiskEvent, RiskType } from '@/types'
 import { cn } from '@/lib/utils'
@@ -24,6 +37,76 @@ import { RiskLevelLegend } from '@/components/RiskLevelLegend'
 export default function RouteReport() {
   const { id } = useParams()
   const { state } = useAppStore()
+  const [uploadingId, setUploadingId] = useState<string | null>(null)
+
+  const handleAddPhoto = async (event: RiskEvent, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const currentPhotos = event.photoUrls?.length
+      ? event.photoUrls
+      : event.photoUrl
+        ? [event.photoUrl]
+        : []
+    if (currentPhotos.length >= 5) {
+      toast.error('Limite máximo de 5 fotos atingido.')
+      return
+    }
+
+    setUploadingId(event.id)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `${event.routeId}/${event.id}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file)
+      if (uploadError) throw uploadError
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('media').getPublicUrl(filePath)
+
+      const newPhotoUrls = [...currentPhotos, publicUrl]
+
+      const { error: updateError } = await supabase
+        .from('events')
+        .update({ photo_urls: newPhotoUrls } as any)
+        .eq('id', event.id)
+
+      if (updateError) throw updateError
+
+      toast.success('Foto adicionada com sucesso!')
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao adicionar foto.')
+    } finally {
+      setUploadingId(null)
+      e.target.value = ''
+    }
+  }
+
+  const removePhoto = async (event: RiskEvent, photoUrlToRemove: string) => {
+    const currentPhotos = event.photoUrls?.length
+      ? event.photoUrls
+      : event.photoUrl
+        ? [event.photoUrl]
+        : []
+    const newPhotoUrls = currentPhotos.filter((url) => url !== photoUrlToRemove)
+
+    try {
+      const { error: updateError } = await supabase
+        .from('events')
+        .update({ photo_urls: newPhotoUrls } as any)
+        .eq('id', event.id)
+
+      if (updateError) throw updateError
+
+      toast.success('Foto removida com sucesso!')
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao remover foto.')
+    }
+  }
 
   const route = state.routes.find((r) => r.id === id)
   const segments = state.segments
@@ -302,15 +385,83 @@ export default function RouteReport() {
                                     {event.note}
                                   </p>
                                 )}
-                                {event.photoUrl && (
-                                  <div className="mt-4 h-32 w-full bg-slate-100 rounded-md overflow-hidden border border-slate-200 print:h-40 print:border-slate-300 flex items-center justify-center shrink-0">
-                                    <img
-                                      src={event.photoUrl}
-                                      alt="Evidência fotográfica"
-                                      className="object-cover w-full h-full"
-                                    />
-                                  </div>
-                                )}
+                                {(() => {
+                                  const photos = event.photoUrls?.length
+                                    ? event.photoUrls
+                                    : event.photoUrl
+                                      ? [event.photoUrl]
+                                      : []
+
+                                  return (
+                                    <div className="mt-4">
+                                      {photos.length > 0 && (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-2 print:grid-cols-3">
+                                          {photos.map((url, i) => (
+                                            <div
+                                              key={i}
+                                              className="relative group aspect-square bg-slate-100 rounded-md overflow-hidden border border-slate-200 print:aspect-[4/3]"
+                                            >
+                                              <img
+                                                src={url}
+                                                alt={`Evidência ${i + 1}`}
+                                                className="object-cover w-full h-full"
+                                              />
+                                              <button
+                                                onClick={() => removePhoto(event, url)}
+                                                className="absolute top-1 right-1 bg-red-500/90 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity print:hidden hover:bg-red-600"
+                                                title="Remover foto"
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          ))}
+                                          {photos.length < 5 && (
+                                            <label className="aspect-square bg-slate-50 border-2 border-dashed border-slate-300 rounded-md flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors print:hidden">
+                                              {uploadingId === event.id ? (
+                                                <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+                                              ) : (
+                                                <>
+                                                  <ImagePlus className="w-6 h-6 text-slate-400 mb-1" />
+                                                  <span className="text-[10px] text-slate-500 font-medium text-center px-1 leading-tight uppercase tracking-wider mt-1">
+                                                    Adicionar
+                                                    <br />
+                                                    Foto
+                                                  </span>
+                                                </>
+                                              )}
+                                              <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => handleAddPhoto(event, e)}
+                                                disabled={uploadingId === event.id}
+                                              />
+                                            </label>
+                                          )}
+                                        </div>
+                                      )}
+                                      {photos.length === 0 && (
+                                        <div className="flex gap-2 print:hidden">
+                                          <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-sm font-medium text-slate-600 cursor-pointer hover:bg-slate-100 transition-colors">
+                                            {uploadingId === event.id ? (
+                                              <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                              <ImagePlus className="w-4 h-4" />
+                                            )}
+                                            Adicionar foto
+                                            <input
+                                              type="file"
+                                              accept="image/*"
+                                              className="hidden"
+                                              onChange={(e) => handleAddPhoto(event, e)}
+                                              disabled={uploadingId === event.id}
+                                            />
+                                          </label>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
                               </div>
                             ))}
                           </div>
