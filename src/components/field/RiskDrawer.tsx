@@ -116,13 +116,13 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
 
   return (
     <Drawer open={!!eventId} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="bg-white">
-        <DrawerHeader>
+      <DrawerContent className="bg-white flex flex-col max-h-[92vh]">
+        <DrawerHeader className="shrink-0">
           <DrawerTitle>{riskName}</DrawerTitle>
           <DrawerDescription>Adicione evidências e observações para este risco.</DrawerDescription>
         </DrawerHeader>
 
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div className="space-y-2">
             <label className="text-sm font-semibold">Observação</label>
             <Textarea
@@ -211,7 +211,7 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
           )}
         </div>
 
-        <DrawerFooter className="pt-2 pb-6">
+        <DrawerFooter className="pt-2 pb-6 shrink-0 border-t border-slate-100 bg-white shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] mt-2">
           <Button onClick={handleSave} className="w-full h-12 font-bold text-base">
             <Save className="w-4 h-4 mr-2" /> Salvar Informações
           </Button>

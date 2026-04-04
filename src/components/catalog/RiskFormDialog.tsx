@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { RiskType } from '@/types'
 import { IconRenderer } from '@/components/icons'
@@ -129,7 +130,9 @@ const riskSchema = z.object({
   category: z.string().optional(),
   description: z.string().optional(),
   baseWeight: z.coerce.number().min(1).max(4, 'O peso deve ser de 1 a 4'),
-  roadContext: z.enum(['urbana', 'rodoviaria']).optional().default('rodoviaria'),
+  roadContexts: z
+    .array(z.enum(['urbana', 'rodoviaria']))
+    .min(1, 'Selecione pelo menos um contexto'),
 })
 
 type RiskFormValues = z.infer<typeof riskSchema>
@@ -162,7 +165,8 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
           category: risk.category || '',
           description: risk.description || '',
           baseWeight: risk.baseWeight,
-          roadContext: risk.roadContext || 'rodoviaria',
+          roadContexts:
+            risk.roadContexts || (risk.roadContext ? [risk.roadContext] : ['rodoviaria']),
         })
       } else {
         form.reset({
@@ -171,14 +175,17 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
           category: '',
           description: '',
           baseWeight: 1,
-          roadContext: 'rodoviaria',
+          roadContexts: ['urbana', 'rodoviaria'],
         })
       }
     }
   }, [open, risk, form])
 
   const handleSubmit = (values: RiskFormValues) => {
-    onSave(values)
+    onSave({
+      ...values,
+      roadContext: values.roadContexts[0], // fallback for legacy code
+    })
   }
 
   return (
@@ -233,22 +240,59 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
               />
 
               <FormField
-                name="roadContext"
+                name="roadContexts"
                 control={form.control}
-                render={({ field }) => (
+                render={() => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Contexto da Via</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o contexto" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="urbana">Via Urbana</SelectItem>
-                        <SelectItem value="rodoviaria">Via Rodoviária</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="mb-2">
+                      <FormLabel>Contexto da Via</FormLabel>
+                    </div>
+                    <div className="flex gap-4">
+                      <FormField
+                        control={form.control}
+                        name="roadContexts"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes('urbana')}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...(field.value || []), 'urbana'])
+                                    : field.onChange(
+                                        field.value?.filter((value) => value !== 'urbana'),
+                                      )
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal cursor-pointer">Via Urbana</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="roadContexts"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes('rodoviaria')}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...(field.value || []), 'rodoviaria'])
+                                    : field.onChange(
+                                        field.value?.filter((value) => value !== 'rodoviaria'),
+                                      )
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal cursor-pointer">
+                              Via Rodoviária
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}

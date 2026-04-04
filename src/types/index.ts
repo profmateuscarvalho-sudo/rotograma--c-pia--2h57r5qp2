@@ -10,6 +10,7 @@ export interface RiskType {
   category?: string
   description?: string
   roadContext?: 'urbana' | 'rodoviaria'
+  roadContexts?: ('urbana' | 'rodoviaria')[]
 }
 
 export interface Route {

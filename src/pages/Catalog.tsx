@@ -110,9 +110,18 @@ export default function Catalog() {
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <Badge variant="outline" className="font-medium bg-white">
-                      {risk.roadContext === 'urbana' ? 'Via Urbana' : 'Via Rodoviária'}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {(risk.roadContexts || (risk.roadContext ? [risk.roadContext] : [])).map(
+                        (ctx) => (
+                          <Badge key={ctx} variant="outline" className="font-medium bg-white">
+                            {ctx === 'urbana' ? 'Via Urbana' : 'Via Rodoviária'}
+                          </Badge>
+                        ),
+                      )}
+                      {!risk.roadContexts && !risk.roadContext && (
+                        <span className="text-xs text-slate-400">Não definido</span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-1">
