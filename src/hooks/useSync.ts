@@ -78,20 +78,31 @@ export const useSync = () => {
 
         for (const event of pendingEvents) {
           let photoUrl = event.photoUrl
+          let photoUrls = event.photoUrls || (photoUrl ? [photoUrl] : [])
           let audioUrl = event.audioUrl
 
-          if (photoUrl?.startsWith('data:image') || photoUrl?.startsWith('blob:')) {
-            try {
-              const res = await fetch(photoUrl)
-              const blob = await res.blob()
-              const path = `${user.id}/events/${event.id}_photo.jpg`
-              await supabase.storage.from('media').upload(path, blob, { upsert: true })
-              const { data } = supabase.storage.from('media').getPublicUrl(path)
-              photoUrl = data.publicUrl
-            } catch (e) {
-              console.error('Failed to upload photo', e)
+          const syncedPhotoUrls: string[] = []
+
+          for (let i = 0; i < photoUrls.length; i++) {
+            let pUrl = photoUrls[i]
+            if (pUrl?.startsWith('data:image') || pUrl?.startsWith('blob:')) {
+              try {
+                const res = await fetch(pUrl)
+                const blob = await res.blob()
+                const path = `${user.id}/events/${event.id}_photo_${i}_${Date.now()}.jpg`
+                await supabase.storage.from('media').upload(path, blob, { upsert: true })
+                const { data } = supabase.storage.from('media').getPublicUrl(path)
+                syncedPhotoUrls.push(data.publicUrl)
+              } catch (e) {
+                console.error('Failed to upload photo', e)
+                syncedPhotoUrls.push(pUrl) // fallback
+              }
+            } else {
+              syncedPhotoUrls.push(pUrl)
             }
           }
+
+          photoUrl = syncedPhotoUrls[0] || null
 
           if (audioUrl?.startsWith('blob:') || audioUrl?.startsWith('data:')) {
             try {
@@ -115,6 +126,7 @@ export const useSync = () => {
             timestamp: event.timestamp,
             note: event.note || null,
             photo_url: photoUrl || null,
+            photo_urls: syncedPhotoUrls,
             audio_url: audioUrl || null,
             video_timestamp: event.videoTimestamp || null,
           })

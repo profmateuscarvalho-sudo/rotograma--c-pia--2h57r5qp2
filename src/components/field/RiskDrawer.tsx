@@ -24,7 +24,7 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
   const { toast } = useToast()
 
   const [note, setNote] = useState('')
-  const [photoUrl, setPhotoUrl] = useState('')
+  const [photoUrls, setPhotoUrls] = useState<string[]>([])
   const [audioUrl, setAudioUrl] = useState('')
   const [isRecording, setIsRecording] = useState(false)
 
@@ -36,29 +36,42 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
   useEffect(() => {
     if (event) {
       setNote(event.note || '')
-      setPhotoUrl(event.photoUrl || '')
+      setPhotoUrls(
+        event.photoUrls?.length ? event.photoUrls : event.photoUrl ? [event.photoUrl] : [],
+      )
       setAudioUrl(event.audioUrl || '')
     } else {
       setNote('')
-      setPhotoUrl('')
+      setPhotoUrls([])
       setAudioUrl('')
     }
   }, [event])
 
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
+    if (file && photoUrls.length < 5) {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setPhotoUrl(reader.result as string)
+        setPhotoUrls((prev) => [...prev, reader.result as string])
+      }
+      reader.onerror = () => {
+        toast({ title: 'Erro ao processar imagem', variant: 'destructive' })
       }
       reader.readAsDataURL(file)
     }
   }
 
+  const removePhoto = (index: number) => {
+    setPhotoUrls((prev) => prev.filter((_, i) => i !== index))
+  }
+
   const toggleRecording = async () => {
     if (isRecording) {
-      mediaRecorderRef.current?.stop()
+      try {
+        mediaRecorderRef.current?.stop()
+      } catch (e) {
+        console.error(e)
+      }
       setIsRecording(false)
     } else {
       try {
@@ -67,13 +80,20 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
         const chunks: Blob[] = []
         recorder.ondataavailable = (e) => chunks.push(e.data)
         recorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'audio/webm' })
-          const reader = new FileReader()
-          reader.onloadend = () => {
-            setAudioUrl(reader.result as string)
+          try {
+            const blob = new Blob(chunks, { type: 'audio/webm' })
+            const reader = new FileReader()
+            reader.onloadend = () => {
+              setAudioUrl(reader.result as string)
+            }
+            reader.onerror = () => {
+              toast({ title: 'Erro ao processar áudio', variant: 'destructive' })
+            }
+            reader.readAsDataURL(blob)
+            stream.getTracks().forEach((t) => t.stop())
+          } catch (e) {
+            console.error('Error processing audio', e)
           }
-          reader.readAsDataURL(blob)
-          stream.getTracks().forEach((t) => t.stop())
         }
         recorder.start()
         mediaRecorderRef.current = recorder
@@ -87,10 +107,17 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
   const handleSave = () => {
     if (eventId) {
       if (updateEvent) {
-        updateEvent(eventId, { note, photoUrl, audioUrl, synced: false })
+        updateEvent(eventId, {
+          note,
+          photoUrl: photoUrls[0] || '',
+          photoUrls,
+          audioUrl,
+          synced: false,
+        })
       } else if (event) {
         event.note = note
-        event.photoUrl = photoUrl
+        event.photoUrl = photoUrls[0] || ''
+        event.photoUrls = photoUrls
         event.audioUrl = audioUrl
         event.synced = false
       }
@@ -121,12 +148,13 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              className="flex-1 h-12 flex flex-col gap-1 items-center justify-center relative overflow-hidden"
+              className="flex-1 h-12 flex flex-col gap-1 items-center justify-center relative overflow-hidden disabled:opacity-50"
               onClick={() => fileInputRef.current?.click()}
+              disabled={photoUrls.length >= 5}
             >
               <Camera className="w-5 h-5 text-slate-600" />
               <span className="text-[10px] font-medium text-slate-500">
-                {photoUrl ? 'Trocar Foto' : 'Tirar Foto'}
+                {photoUrls.length >= 5 ? 'Limite (5/5)' : `Tirar Foto (${photoUrls.length}/5)`}
               </span>
               <input
                 type="file"
@@ -135,6 +163,7 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
                 className="absolute inset-0 opacity-0 cursor-pointer hidden"
                 ref={fileInputRef}
                 onChange={handlePhotoCapture}
+                disabled={photoUrls.length >= 5}
               />
             </Button>
 
@@ -154,21 +183,28 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
             </Button>
           </div>
 
-          {photoUrl && (
-            <div className="relative mt-2 rounded-lg overflow-hidden border border-slate-200">
-              <img
-                src={photoUrl}
-                alt="Evidência fotográfica"
-                className="w-full h-32 object-cover"
-              />
-              <Button
-                variant="destructive"
-                size="icon"
-                className="absolute top-2 right-2 h-8 w-8 rounded-full"
-                onClick={() => setPhotoUrl('')}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+          {photoUrls.length > 0 && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {photoUrls.map((url, i) => (
+                <div
+                  key={i}
+                  className="relative rounded-lg overflow-hidden border border-slate-200 aspect-square"
+                >
+                  <img
+                    src={url}
+                    alt={`Evidência ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6 rounded-full"
+                    onClick={() => removePhoto(i)}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              ))}
             </div>
           )}
 
