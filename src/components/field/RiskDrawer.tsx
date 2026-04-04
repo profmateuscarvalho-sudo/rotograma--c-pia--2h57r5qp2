@@ -50,8 +50,11 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file && photoUrls.length < 5) {
-      const url = URL.createObjectURL(file)
-      setPhotoUrls((prev) => [...prev, url])
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPhotoUrls((prev) => [...prev, reader.result as string])
+      }
+      reader.readAsDataURL(file)
     }
   }
 
@@ -76,8 +79,11 @@ export function RiskDrawer({ eventId, riskName, onClose }: RiskDrawerProps) {
         recorder.onstop = () => {
           try {
             const blob = new Blob(chunks, { type: 'audio/webm' })
-            const url = URL.createObjectURL(blob)
-            setAudioUrl(url)
+            const reader = new FileReader()
+            reader.onloadend = () => {
+              setAudioUrl(reader.result as string)
+            }
+            reader.readAsDataURL(blob)
             stream.getTracks().forEach((t) => t.stop())
           } catch (e) {
             console.error('Error processing audio', e)

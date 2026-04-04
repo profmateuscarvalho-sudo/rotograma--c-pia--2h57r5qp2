@@ -62,38 +62,26 @@ export default function RouteReport() {
 
     setUploadingId(event.id)
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${event.id}_photo_${Date.now()}.${fileExt}`
-      const filePath = `${user.id}/events/${fileName}`
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const base64Url = reader.result as string
+        const newPhotoUrls = [...currentPhotos, base64Url]
 
-      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file)
-      if (uploadError) throw uploadError
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('media').getPublicUrl(filePath)
-
-      const newPhotoUrls = [...currentPhotos, publicUrl]
-
-      const { error: updateError } = await supabase
-        .from('events')
-        .update({ photo_urls: newPhotoUrls } as any)
-        .eq('id', event.id)
-
-      if (updateError) throw updateError
-
-      if (updateEvent) {
-        updateEvent(event.id, { photoUrls: newPhotoUrls })
-      } else {
-        event.photoUrls = newPhotoUrls
+        if (updateEvent) {
+          updateEvent(event.id, { photoUrls: newPhotoUrls, synced: false })
+        } else {
+          event.photoUrls = newPhotoUrls
+          event.synced = false
+        }
+        toast.success('Foto adicionada! Será sincronizada quando houver conexão.')
+        setUploadingId(null)
       }
-
-      toast.success('Foto adicionada com sucesso!')
+      reader.readAsDataURL(file)
     } catch (err) {
       console.error(err)
-      toast.error('Erro ao adicionar foto.')
-    } finally {
+      toast.error('Erro ao processar a foto.')
       setUploadingId(null)
+    } finally {
       e.target.value = ''
     }
   }
@@ -107,19 +95,12 @@ export default function RouteReport() {
     const newPhotoUrls = currentPhotos.filter((url) => url !== photoUrlToRemove)
 
     try {
-      const { error: updateError } = await supabase
-        .from('events')
-        .update({ photo_urls: newPhotoUrls } as any)
-        .eq('id', event.id)
-
-      if (updateError) throw updateError
-
       if (updateEvent) {
-        updateEvent(event.id, { photoUrls: newPhotoUrls })
+        updateEvent(event.id, { photoUrls: newPhotoUrls, synced: false })
       } else {
         event.photoUrls = newPhotoUrls
+        event.synced = false
       }
-
       toast.success('Foto removida com sucesso!')
     } catch (err) {
       console.error(err)

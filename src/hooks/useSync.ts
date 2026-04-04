@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 
 export const useSync = () => {
-  const { state, markAsSynced } = useAppStore()
+  const { state, markAsSynced, updateEvent, updateObservation } = useAppStore() as any
   const { user } = useAuth()
   const [isSyncing, setIsSyncing] = useState(false)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -130,7 +130,17 @@ export const useSync = () => {
             audio_url: audioUrl || null,
             video_timestamp: event.videoTimestamp || null,
           })
-          if (!error) syncedEvents.push(event.id)
+          if (!error) {
+            syncedEvents.push(event.id)
+            if (updateEvent) {
+              updateEvent(event.id, {
+                photoUrl: photoUrl || undefined,
+                photoUrls: syncedPhotoUrls,
+                audioUrl: audioUrl || undefined,
+                synced: true,
+              })
+            }
+          }
         }
 
         for (const obs of pendingObservations) {
@@ -159,7 +169,15 @@ export const useSync = () => {
             video_timestamp: obs.videoTimestamp || null,
             timestamp: obs.timestamp,
           })
-          if (!error) syncedObservations.push(obs.id)
+          if (!error) {
+            syncedObservations.push(obs.id)
+            if (updateObservation) {
+              updateObservation(obs.id, {
+                audioUrl: audioUrl || undefined,
+                synced: true,
+              })
+            }
+          }
         }
       } catch (err) {
         console.error('Sync failed', err)
