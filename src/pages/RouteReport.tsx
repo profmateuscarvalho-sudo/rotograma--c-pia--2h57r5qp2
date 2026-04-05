@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { IconRenderer } from '@/components/icons'
 import { RiskEvent, RiskType } from '@/types'
+import { SignageIcon } from '@/components/ui/signage-icon'
 import { cn } from '@/lib/utils'
 import { RiskLevelLegend } from '@/components/RiskLevelLegend'
 
@@ -342,12 +343,12 @@ export default function RouteReport() {
                         key={risk.id}
                         className="flex gap-4 border-b border-slate-100 last:border-0 pb-6 last:pb-0 print:border-slate-300 print:last:border-0"
                       >
-                        <div className="shrink-0 flex flex-col items-center gap-2">
-                          <div
-                            className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${getRiskWeightStyles(risk.baseWeight, true)}`}
-                          >
-                            <IconRenderer name={risk.iconName} className="w-6 h-6 text-current" />
-                          </div>
+                        <div className="shrink-0 flex flex-col items-center gap-2 pt-1">
+                          <SignageIcon
+                            iconName={risk.iconName}
+                            customIconUrl={risk.customIconUrl}
+                            className="w-12 h-12"
+                          />
                         </div>
                         <div className="flex-1">
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 mb-3">

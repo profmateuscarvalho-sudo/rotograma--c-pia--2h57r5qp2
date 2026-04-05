@@ -35,6 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Upload, X, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
+import { SignageIcon } from '@/components/ui/signage-icon'
 
 const ICONS = [
   'TriangleAlert',
@@ -249,6 +250,20 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 flex justify-center py-6 bg-slate-50 border rounded-md relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-50"></div>
+                <div className="text-center flex flex-col items-center relative z-10">
+                  <span className="text-xs font-bold text-slate-500 uppercase mb-4 tracking-wider">
+                    Pré-visualização
+                  </span>
+                  <SignageIcon
+                    iconName={form.watch('iconName')}
+                    customIconUrl={form.watch('customIconUrl')}
+                    className="w-16 h-16 shadow-md"
+                  />
+                </div>
+              </div>
+
               <FormField
                 name="name"
                 control={form.control}

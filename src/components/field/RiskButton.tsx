@@ -1,9 +1,6 @@
-import React, { useRef } from 'react'
+import React from 'react'
 import { RiskType } from '@/types'
-import { IconRenderer } from '@/components/icons'
-import { useLongPress } from '@/hooks/useLongPress'
-import { cn } from '@/lib/utils'
-import { getRiskWeightStyles } from '@/lib/risk-utils'
+import { SignageIcon } from '@/components/ui/signage-icon'
 
 interface RiskButtonProps {
   risk: RiskType
@@ -14,50 +11,54 @@ interface RiskButtonProps {
 }
 
 export function RiskButton({ risk, count, onAdd, onRemove, onLongPressRisk }: RiskButtonProps) {
-  const clickTimeout = useRef<NodeJS.Timeout | null>(null)
+  let pressTimer: NodeJS.Timeout
 
-  const handleTap = () => {
-    if (clickTimeout.current !== null) {
-      // Double tap detected -> Register risk
-      clearTimeout(clickTimeout.current)
-      clickTimeout.current = null
-      onAdd(risk)
-    } else {
-      // Single tap detected -> Wait to confirm it's not a double tap, then remove if exists
-      clickTimeout.current = setTimeout(() => {
-        clickTimeout.current = null
-        if (count > 0) {
-          onRemove(risk)
-        }
-      }, 250) // 250ms delay to differentiate single and double tap
-    }
+  const handleTouchStart = () => {
+    pressTimer = setTimeout(() => {
+      onLongPressRisk(risk)
+    }, 500)
   }
 
-  const handlers = useLongPress(() => onLongPressRisk(risk), handleTap, { delay: 600 })
+  const handleTouchEnd = () => {
+    if (pressTimer) clearTimeout(pressTimer)
+  }
 
-  const styles = getRiskWeightStyles(risk.baseWeight, count > 0)
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    onAdd(risk)
+  }
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    onRemove(risk)
+  }
 
   return (
     <button
-      {...handlers}
-      className={cn(
-        'relative flex flex-col items-center justify-center p-2 min-h-[76px] rounded-xl border-2 shadow-sm transition-all duration-100 ease-out select-none outline-none touch-manipulation',
-        styles,
-        'active:scale-95 active:brightness-95',
-        count > 0 && 'ring-1 ring-offset-1 ring-slate-300',
-      )}
-      style={{ WebkitTapHighlightColor: 'transparent' }}
+      className="relative flex flex-col items-center justify-start p-2 bg-white rounded-xl shadow-sm border border-slate-200 active:scale-95 transition-transform select-none h-full"
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleTouchStart}
+      onMouseUp={handleTouchEnd}
+      onMouseLeave={handleTouchEnd}
     >
-      <IconRenderer name={risk.iconName} className="w-7 h-7 mb-1 text-current" />
-      <span className="font-bold text-[11px] text-center leading-tight line-clamp-2">
+      {count > 0 && (
+        <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm z-20 animate-in zoom-in">
+          {count}
+        </div>
+      )}
+      <div className="h-14 flex items-center justify-center mb-2 mt-1">
+        <SignageIcon
+          iconName={risk.iconName}
+          customIconUrl={risk.customIconUrl}
+          className="w-10 h-10"
+        />
+      </div>
+      <span className="text-[10px] font-bold text-slate-700 text-center leading-tight line-clamp-2 mt-auto">
         {risk.name}
       </span>
-
-      {count > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 bg-slate-900 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-md animate-in zoom-in">
-          {count}
-        </span>
-      )}
     </button>
   )
 }
