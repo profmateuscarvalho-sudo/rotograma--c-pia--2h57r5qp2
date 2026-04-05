@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react'
 import { RiskType } from '@/types'
 import { SignageIcon } from '@/components/ui/signage-icon'
 import { cn } from '@/lib/utils'
+import { getRiskWeightStyles } from '@/lib/risk-utils'
 
 interface RiskButtonProps {
   risk: RiskType
@@ -57,7 +58,7 @@ export function RiskButton({ risk, count, onAdd, onRemove, onLongPressRisk }: Ri
       className={cn(
         'relative flex flex-col items-center justify-center p-2 rounded-xl transition-all select-none touch-manipulation border-2',
         count > 0
-          ? 'bg-yellow-50 border-yellow-400 shadow-sm'
+          ? getRiskWeightStyles(risk.baseWeight, true)
           : 'bg-white border-transparent shadow-sm hover:bg-slate-50',
         isPressed && 'scale-95',
       )}
@@ -79,7 +80,12 @@ export function RiskButton({ risk, count, onAdd, onRemove, onLongPressRisk }: Ri
           </span>
         )}
       </div>
-      <span className="text-[10px] font-bold text-center leading-tight line-clamp-2 h-7 px-1 text-slate-700">
+      <span
+        className={cn(
+          'text-[10px] font-bold text-center leading-tight line-clamp-2 h-7 px-1',
+          count > 0 ? 'text-white' : 'text-slate-700',
+        )}
+      >
         {risk.name}
       </span>
     </button>
