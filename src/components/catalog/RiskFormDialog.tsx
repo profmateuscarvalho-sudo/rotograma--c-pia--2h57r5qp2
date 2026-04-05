@@ -373,7 +373,7 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
                 control={form.control}
                 render={({ field }) => (
                   <FormItem className="col-span-1">
-                    <FormLabel>Peso (1 a 4)</FormLabel>
+                    <FormLabel>Nível de Risco</FormLabel>
                     <Select
                       onValueChange={(v) => field.onChange(Number(v))}
                       value={String(field.value)}
@@ -384,11 +384,10 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {[1, 2, 3, 4].map((n) => (
-                          <SelectItem key={n} value={String(n)}>
-                            {n}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="1">Baixo</SelectItem>
+                        <SelectItem value="2">Médio</SelectItem>
+                        <SelectItem value="3">Alto</SelectItem>
+                        <SelectItem value="4">Crítico</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

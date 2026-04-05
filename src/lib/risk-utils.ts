@@ -120,13 +120,13 @@ export const getRiskWeightStyles = (weight: number, active: boolean) => {
 export const getRiskWeightLevelName = (weight: number): string => {
   switch (weight) {
     case 1:
-      return 'Nível 1 - Baixo'
+      return 'Baixo'
     case 2:
-      return 'Nível 2 - Médio'
+      return 'Médio'
     case 3:
-      return 'Nível 3 - Alto'
+      return 'Alto'
     case 4:
-      return 'Nível 4 - Crítico'
+      return 'Crítico'
     default:
       return 'Desconhecido'
   }

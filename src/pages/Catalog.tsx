@@ -81,7 +81,7 @@ export default function Catalog() {
                 <TableHead>Risco</TableHead>
                 <TableHead className="hidden md:table-cell">Categoria</TableHead>
                 <TableHead className="hidden md:table-cell">Contexto</TableHead>
-                <TableHead className="text-center">Peso / Nível</TableHead>
+                <TableHead className="text-center">Nível de Risco</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -132,11 +132,8 @@ export default function Catalog() {
                         variant="outline"
                         className={`font-bold px-3 py-1 ${getRiskWeightStyles(risk.baseWeight, true)}`}
                       >
-                        Peso {risk.baseWeight}
-                      </Badge>
-                      <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
                         {getRiskWeightLevelName(risk.baseWeight)}
-                      </span>
+                      </Badge>
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
