@@ -90,9 +90,17 @@ export default function Catalog() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div
-                        className={`p-2 rounded-md hidden sm:flex border ${getRiskWeightStyles(risk.baseWeight, false)}`}
+                        className={`p-2 rounded-md hidden sm:flex border ${getRiskWeightStyles(risk.baseWeight, false)} items-center justify-center overflow-hidden`}
                       >
-                        <IconRenderer name={risk.iconName} className="w-5 h-5 text-current" />
+                        {risk.customIconUrl ? (
+                          <img
+                            src={risk.customIconUrl}
+                            alt={risk.name}
+                            className="w-5 h-5 object-contain"
+                          />
+                        ) : (
+                          <IconRenderer name={risk.iconName} className="w-5 h-5 text-current" />
+                        )}
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900">{risk.name}</div>

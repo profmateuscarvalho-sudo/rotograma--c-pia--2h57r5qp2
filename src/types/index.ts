@@ -6,6 +6,7 @@ export interface RiskType {
   id: string
   name: string
   iconName: string
+  customIconUrl?: string
   baseWeight: number
   category?: string
   description?: string
