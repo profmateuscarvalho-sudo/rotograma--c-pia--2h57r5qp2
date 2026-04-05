@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useRef, useState } from 'react'
 import { RiskType } from '@/types'
 import { SignageIcon } from '@/components/ui/signage-icon'
+import { cn } from '@/lib/utils'
 
 interface RiskButtonProps {
   risk: RiskType
@@ -11,52 +12,74 @@ interface RiskButtonProps {
 }
 
 export function RiskButton({ risk, count, onAdd, onRemove, onLongPressRisk }: RiskButtonProps) {
-  let pressTimer: NodeJS.Timeout
+  const [isPressed, setIsPressed] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clickCount = useRef(0)
 
-  const handleTouchStart = () => {
-    pressTimer = setTimeout(() => {
+  const handlePointerDown = () => {
+    setIsPressed(true)
+    timerRef.current = setTimeout(() => {
       onLongPressRisk(risk)
+      clickCount.current = 0 // reset clicks if long press
     }, 500)
   }
 
-  const handleTouchEnd = () => {
-    if (pressTimer) clearTimeout(pressTimer)
+  const handlePointerUp = () => {
+    setIsPressed(false)
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+    }
   }
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault()
-    onAdd(risk)
-  }
+    e.stopPropagation()
 
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault()
-    onRemove(risk)
+    clickCount.current += 1
+
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current)
+    }
+
+    clickTimeoutRef.current = setTimeout(() => {
+      if (clickCount.current === 1) {
+        onRemove(risk)
+      } else if (clickCount.current >= 2) {
+        onAdd(risk)
+      }
+      clickCount.current = 0
+    }, 300)
   }
 
   return (
     <button
-      className="relative flex flex-col items-center justify-start p-2 bg-white rounded-xl shadow-sm border border-slate-200 active:scale-95 transition-transform select-none h-full"
-      onClick={handleClick}
-      onContextMenu={handleContextMenu}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleTouchStart}
-      onMouseUp={handleTouchEnd}
-      onMouseLeave={handleTouchEnd}
-    >
-      {count > 0 && (
-        <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm z-20 animate-in zoom-in">
-          {count}
-        </div>
+      className={cn(
+        'relative flex flex-col items-center justify-center p-2 rounded-xl transition-all select-none touch-manipulation border-2',
+        count > 0
+          ? 'bg-yellow-50 border-yellow-400 shadow-sm'
+          : 'bg-white border-transparent shadow-sm hover:bg-slate-50',
+        isPressed && 'scale-95',
       )}
-      <div className="h-14 flex items-center justify-center mb-2 mt-1">
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      onClick={handleClick}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <div className="relative mb-2">
         <SignageIcon
           iconName={risk.iconName}
           customIconUrl={risk.customIconUrl}
-          className="w-10 h-10"
+          className={cn('w-12 h-12 transition-transform', count > 0 ? 'scale-110' : 'scale-100')}
         />
+        {count > 0 && (
+          <span className="absolute -top-2 -right-2 bg-slate-900 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm z-10 animate-fade-in">
+            {count}
+          </span>
+        )}
       </div>
-      <span className="text-[10px] font-bold text-slate-700 text-center leading-tight line-clamp-2 mt-auto">
+      <span className="text-[10px] font-bold text-center leading-tight line-clamp-2 h-7 px-1 text-slate-700">
         {risk.name}
       </span>
     </button>

@@ -48,6 +48,12 @@ const ICON_CATEGORIES = {
     'GitMerge',
     'RotateCw',
     'Waves',
+    'Merge',
+    'Split',
+    'ArrowUpLeft',
+    'ArrowUpRight',
+    'ArrowRight',
+    'ArrowLeft',
   ],
   Situações: [
     'HardHat',
@@ -59,6 +65,10 @@ const ICON_CATEGORIES = {
     'Rabbit',
     'Bird',
     'Droplets',
+    'Cat',
+    'Snail',
+    'PawPrint',
+    'Bug',
   ],
   'Avaliação / Serviços / Clima': [
     'Signal',
