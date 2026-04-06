@@ -2,9 +2,29 @@ import { RiskEvent, RiskLevel, RiskType, RouteRiskLevel } from '@/types'
 import { LEVEL_THRESHOLDS, ROUTE_LEVEL_THRESHOLDS } from './constants'
 
 export const calculateEventScore = (event: RiskEvent, catalog: RiskType[]): number => {
-  const riskType = catalog.find((r) => r.id === event.riskTypeId)
+  if (!event || !catalog) return 0
+  const riskType = catalog.find((r) => r?.id === event?.riskTypeId)
   if (!riskType) return 0
-  return riskType.baseWeight
+
+  const weight = riskType.baseWeight
+  let points = 0
+
+  if (typeof weight === 'string') {
+    const w = weight.toLowerCase()
+    if (w.includes('baixo')) points = 10
+    else if (w.includes('médio') || w.includes('medio')) points = 25
+    else if (w.includes('alto')) points = 45
+    else if (w.includes('crítico') || w.includes('critico')) points = 95
+    else points = Number(weight)
+  } else {
+    if (weight === 1) points = 10
+    else if (weight === 2) points = 25
+    else if (weight === 3) points = 45
+    else if (weight === 4) points = 95
+    else points = Number(weight)
+  }
+
+  return isNaN(points) ? 10 : points
 }
 
 export const calculateSegmentScore = (
@@ -12,21 +32,25 @@ export const calculateSegmentScore = (
   events: RiskEvent[],
   catalog: RiskType[],
 ): number => {
-  const segmentEvents = events.filter((e) => e.segmentId === segmentId)
+  if (!events || !segmentId) return 0
+  const segmentEvents = events.filter((e) => e?.segmentId === segmentId)
   return segmentEvents.reduce((total, event) => total + calculateEventScore(event, catalog), 0)
 }
 
 export const getRiskLevel = (score: number): RiskLevel => {
-  if (score <= LEVEL_THRESHOLDS.BAIXO) return 'Baixo'
-  if (score <= LEVEL_THRESHOLDS.MEDIO) return 'Médio'
-  if (score <= LEVEL_THRESHOLDS.ALTO) return 'Alto'
+  const s = Number(score) || 0
+  if (s <= LEVEL_THRESHOLDS.BAIXO) return 'Baixo'
+  if (s <= LEVEL_THRESHOLDS.MEDIO) return 'Médio'
+  if (s <= LEVEL_THRESHOLDS.ALTO) return 'Alto'
   return 'Crítico'
 }
 
 export const getRouteRiskLevel = (score: number): RouteRiskLevel => {
-  if (score <= ROUTE_LEVEL_THRESHOLDS.BAIXO) return 'Baixo'
-  if (score <= ROUTE_LEVEL_THRESHOLDS.MEDIO) return 'Médio'
-  if (score <= ROUTE_LEVEL_THRESHOLDS.ALTO) return 'Alto'
+  const s = Number(score) || 0
+  if (s === 0) return 'Sem Riscos'
+  if (s <= ROUTE_LEVEL_THRESHOLDS.BAIXO) return 'Baixo'
+  if (s <= ROUTE_LEVEL_THRESHOLDS.MEDIO) return 'Médio'
+  if (s <= ROUTE_LEVEL_THRESHOLDS.ALTO) return 'Alto'
   return 'Crítico'
 }
 
@@ -92,8 +116,24 @@ export const getRiskColorHex = (level: RiskLevel): string => {
   }
 }
 
-export const getRiskWeightStyles = (weight: number, active: boolean) => {
-  switch (weight) {
+export const getRiskWeightStyles = (weight: number | string, active: boolean) => {
+  let normalizedWeight = 1
+  if (typeof weight === 'string') {
+    const w = weight.toLowerCase()
+    if (w.includes('baixo')) normalizedWeight = 1
+    else if (w.includes('médio') || w.includes('medio')) normalizedWeight = 2
+    else if (w.includes('alto')) normalizedWeight = 3
+    else if (w.includes('crítico') || w.includes('critico')) normalizedWeight = 4
+    else normalizedWeight = Number(weight)
+  } else {
+    if (weight === 10 || weight === 15) normalizedWeight = 1
+    else if (weight === 25 || weight === 30) normalizedWeight = 2
+    else if (weight === 45 || weight === 50) normalizedWeight = 3
+    else if (weight >= 90) normalizedWeight = 4
+    else normalizedWeight = Number(weight)
+  }
+
+  switch (normalizedWeight) {
     case 1:
       return active
         ? 'bg-green-500 border-green-600 text-white'
@@ -117,17 +157,18 @@ export const getRiskWeightStyles = (weight: number, active: boolean) => {
   }
 }
 
-export const getRiskWeightLevelName = (weight: number): string => {
-  switch (weight) {
-    case 1:
-      return 'Baixo'
-    case 2:
-      return 'Médio'
-    case 3:
-      return 'Alto'
-    case 4:
-      return 'Crítico'
-    default:
-      return 'Desconhecido'
+export const getRiskWeightLevelName = (weight: number | string): string => {
+  if (typeof weight === 'string') {
+    const w = weight.toLowerCase()
+    if (w.includes('baixo')) return 'Baixo'
+    if (w.includes('médio') || w.includes('medio')) return 'Médio'
+    if (w.includes('alto')) return 'Alto'
+    if (w.includes('crítico') || w.includes('critico')) return 'Crítico'
   }
+  const wNum = Number(weight)
+  if (wNum === 1 || (wNum > 0 && wNum <= 15)) return 'Baixo'
+  if (wNum === 2 || (wNum > 15 && wNum <= 30)) return 'Médio'
+  if (wNum === 3 || (wNum > 30 && wNum <= 50)) return 'Alto'
+  if (wNum === 4 || wNum > 50) return 'Crítico'
+  return 'Baixo'
 }

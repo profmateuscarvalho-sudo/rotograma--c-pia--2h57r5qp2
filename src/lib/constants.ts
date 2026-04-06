@@ -129,13 +129,13 @@ export const DEFAULT_CATALOG: RiskType[] = [
 ]
 
 export const LEVEL_THRESHOLDS = {
-  BAIXO: 25,
-  MEDIO: 50,
-  ALTO: 90,
+  BAIXO: 15,
+  MEDIO: 30,
+  ALTO: 50,
 }
 
 export const ROUTE_LEVEL_THRESHOLDS = {
-  BAIXO: 25,
-  MEDIO: 50,
-  ALTO: 90,
+  BAIXO: 15,
+  MEDIO: 30,
+  ALTO: 50,
 }

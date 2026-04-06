@@ -7,7 +7,7 @@ export interface RiskType {
   name: string
   iconName: string
   customIconUrl?: string
-  baseWeight: number
+  baseWeight: number | string
   category?: string
   description?: string
   roadContext?: 'urbana' | 'rodoviaria'

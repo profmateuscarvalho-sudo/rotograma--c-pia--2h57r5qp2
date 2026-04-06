@@ -74,17 +74,23 @@ export default function Index() {
     }
   }
   const { isSyncing, isOnline, pendingCount } = useSync()
-  const { routes, segments, events, catalog } = state
+
+  const routes = state?.routes || []
+  const segments = state?.segments || []
+  const events = state?.events || []
+  const catalog = state?.catalog || []
 
   const totalRoutes = routes.length
-  const inProgress = routes.filter((r) => r.status === 'em_andamento').length
+  const inProgress = routes.filter((r) => r?.status === 'em_andamento').length
 
-  const completedRoutes = routes.filter((r) => r.status === 'concluido')
+  const completedRoutes = routes.filter((r) => r?.status === 'concluido')
   let totalScore = 0
   let totalSegmentsCalculated = 0
   completedRoutes.forEach((route) => {
-    const routeSegments = segments.filter((s) => s.routeId === route.id)
+    if (!route?.id) return
+    const routeSegments = segments.filter((s) => s?.routeId === route.id)
     routeSegments.forEach((segment) => {
+      if (!segment?.id) return
       totalScore += calculateSegmentScore(segment.id, events, catalog)
       totalSegmentsCalculated++
     })
@@ -169,7 +175,7 @@ export default function Index() {
           <CardContent>
             <div className="text-2xl font-bold">{events.length}</div>
             <p className="text-xs text-muted-foreground">
-              {events.filter((e) => !e.synced).length} pendentes de sync
+              {events.filter((e) => !e?.synced).length} pendentes de sync
             </p>
           </CardContent>
         </Card>
@@ -240,12 +246,13 @@ export default function Index() {
         ) : (
           <div className="grid gap-3">
             {routes.map((route) => {
-              const routeEvents = events.filter((e) => e.routeId === route.id)
+              if (!route?.id) return null
+              const routeEvents = events.filter((e) => e?.routeId === route.id)
               const routeScore = routeEvents.reduce(
                 (total, event) => total + calculateEventScore(event, catalog),
                 0,
               )
-              const routeSegments = segments.filter((s) => s.routeId === route.id)
+              const routeSegments = segments.filter((s) => s?.routeId === route.id)
               const segmentCount = Math.max(routeSegments.length, 1)
               const avgRouteScore = routeScore / segmentCount
               const routeRiskLevel = getRouteRiskLevel(avgRouteScore)
