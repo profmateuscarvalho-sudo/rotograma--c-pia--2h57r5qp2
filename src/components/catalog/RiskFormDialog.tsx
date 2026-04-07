@@ -268,7 +268,7 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
                   <SignageIcon
                     iconName={form.watch('iconName')}
                     customIconUrl={form.watch('customIconUrl')}
-                    className="w-16 h-16 shadow-md"
+                    className="w-20 h-20"
                   />
                 </div>
               </div>
