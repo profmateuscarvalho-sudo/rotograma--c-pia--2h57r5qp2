@@ -1,6 +1,8 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
+import { Upload, RotateCw, X } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Dialog,
@@ -144,17 +146,22 @@ const ICON_CATEGORIES = {
   ],
 }
 
-const riskSchema = z.object({
-  name: z.string().min(1, 'O nome é obrigatório'),
-  iconName: z.string().min(1, 'Selecione um ícone'),
-  customIconUrl: z.string().optional(),
-  category: z.string().optional(),
-  description: z.string().optional(),
-  baseWeight: z.coerce.number().min(1).max(4, 'O peso deve ser de 1 a 4'),
-  roadContexts: z
-    .array(z.enum(['urbana', 'rodoviaria']))
-    .min(1, 'Selecione pelo menos um contexto'),
-})
+const riskSchema = z
+  .object({
+    name: z.string().min(1, 'O nome é obrigatório'),
+    iconName: z.string(),
+    customIconUrl: z.string().optional(),
+    category: z.string().optional(),
+    description: z.string().optional(),
+    baseWeight: z.coerce.number().min(1).max(4, 'O peso deve ser de 1 a 4'),
+    roadContexts: z
+      .array(z.enum(['urbana', 'rodoviaria']))
+      .min(1, 'Selecione pelo menos um contexto'),
+  })
+  .refine((data) => data.iconName || data.customIconUrl, {
+    message: 'Selecione um ícone ou faça upload de uma imagem',
+    path: ['iconName'],
+  })
 
 type RiskFormValues = z.infer<typeof riskSchema>
 
@@ -166,6 +173,9 @@ interface RiskFormDialogProps {
 }
 
 export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDialogProps) {
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const form = useForm<RiskFormValues>({
     resolver: zodResolver(riskSchema),
     defaultValues: {
@@ -177,6 +187,34 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
       baseWeight: 1,
     },
   })
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setIsUploading(true)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`
+      const filePath = `icons/${fileName}`
+
+      const { error: uploadError } = await supabase.storage.from('images').upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('images').getPublicUrl(filePath)
+
+      form.setValue('customIconUrl', data.publicUrl)
+      form.setValue('iconName', '')
+    } catch (error) {
+      console.error('Error uploading image:', error)
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
 
   useEffect(() => {
     if (open) {
@@ -254,41 +292,98 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
                 control={form.control}
                 render={({ field }) => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Ícone (Sinalização)</FormLabel>
-                    <div className="w-full max-h-[220px] overflow-y-auto p-3 border rounded-md bg-slate-50 space-y-5">
-                      {Object.entries(ICON_CATEGORIES).map(([category, icons]) => (
-                        <div key={category}>
-                          <h4 className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
-                            {category}
-                          </h4>
-                          <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                            {icons.map((icon) => (
-                              <div
-                                key={icon}
-                                className={cn(
-                                  'p-2 border rounded-md cursor-pointer flex items-center justify-center transition-colors',
-                                  field.value === icon && !form.watch('customIconUrl')
-                                    ? 'bg-yellow-100 border-yellow-500 text-yellow-700 shadow-sm'
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300',
-                                )}
-                                onClick={() => {
-                                  field.onChange(icon)
-                                  form.setValue('customIconUrl', undefined)
-                                }}
-                                title={icon}
-                              >
-                                <IconRenderer name={icon} className="w-5 h-5" />
-                              </div>
-                            ))}
+                    <div className="flex items-center justify-between mb-2">
+                      <FormLabel>Ícone (Sinalização)</FormLabel>
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          ref={fileInputRef}
+                          onChange={handleFileUpload}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs bg-slate-50"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploading}
+                        >
+                          {isUploading ? (
+                            <span className="flex items-center">
+                              <RotateCw className="w-3 h-3 mr-1 animate-spin" /> Enviando...
+                            </span>
+                          ) : (
+                            <span className="flex items-center">
+                              <Upload className="w-3 h-3 mr-1" /> Upload de Imagem
+                            </span>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {form.watch('customIconUrl') ? (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-md flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 border bg-white rounded flex items-center justify-center p-1 shadow-sm">
+                            <img
+                              src={form.watch('customIconUrl')}
+                              alt="Custom"
+                              className="max-w-full max-h-full object-contain"
+                            />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">
+                              Imagem Personalizada em uso
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Substitui os ícones da biblioteca.
+                            </p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                    {form.watch('customIconUrl') && (
-                      <p className="text-xs text-amber-600 mt-2 font-medium">
-                        Um ícone personalizado antigo está em uso. Selecione um ícone da biblioteca
-                        acima para atualizar o padrão visual.
-                      </p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            form.setValue('customIconUrl', undefined)
+                            form.setValue('iconName', 'TriangleAlert')
+                          }}
+                        >
+                          <X className="w-4 h-4 mr-1" /> Remover
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="w-full max-h-[220px] overflow-y-auto p-3 border rounded-md bg-slate-50 space-y-5">
+                        {Object.entries(ICON_CATEGORIES).map(([category, icons]) => (
+                          <div key={category}>
+                            <h4 className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
+                              {category}
+                            </h4>
+                            <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                              {icons.map((icon) => (
+                                <div
+                                  key={icon}
+                                  className={cn(
+                                    'p-2 border rounded-md cursor-pointer flex items-center justify-center transition-colors',
+                                    field.value === icon
+                                      ? 'bg-yellow-100 border-yellow-500 text-yellow-700 shadow-sm'
+                                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300',
+                                  )}
+                                  onClick={() => {
+                                    field.onChange(icon)
+                                  }}
+                                  title={icon}
+                                >
+                                  <IconRenderer name={icon} className="w-5 h-5" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                     <FormMessage />
                   </FormItem>
@@ -384,10 +479,10 @@ export function RiskFormDialog({ open, onOpenChange, risk, onSave }: RiskFormDia
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="1">Baixo</SelectItem>
-                        <SelectItem value="2">Médio</SelectItem>
-                        <SelectItem value="3">Alto</SelectItem>
-                        <SelectItem value="4">Crítico</SelectItem>
+                        <SelectItem value="1">Baixo (0-15 pts)</SelectItem>
+                        <SelectItem value="2">Médio (16-30 pts)</SelectItem>
+                        <SelectItem value="3">Alto (31-50 pts)</SelectItem>
+                        <SelectItem value="4">Crítico (&gt; 50 pts)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
