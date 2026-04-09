@@ -57,12 +57,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchRemoteData = useCallback(async () => {
     if (!user) return
     try {
-      const [routesRes, segmentsRes, eventsRes, obsRes] = await Promise.all([
+      const [routesRes, segmentsRes, eventsRes, obsRes, catalogRes] = await Promise.all([
         supabase.from('routes').select('*'),
         supabase.from('segments').select('*'),
         supabase.from('events').select('*'),
         supabase.from('observations').select('*'),
+        supabase.from('risk_catalog' as any).select('*'),
       ])
+
+      let remoteCatalog: RiskType[] | null = null
+      let shouldUploadLocalCatalog = false
+
+      if (!catalogRes.error && catalogRes.data) {
+        if (catalogRes.data.length > 0) {
+          remoteCatalog = catalogRes.data.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            iconName: c.icon_name,
+            customIconUrl: c.custom_icon_url || undefined,
+            category: c.category || undefined,
+            description: c.description || undefined,
+            baseWeight: c.base_weight,
+            roadContexts: c.road_contexts,
+          }))
+        } else {
+          shouldUploadLocalCatalog = true
+        }
+      }
 
       if (!routesRes.error && !segmentsRes.error && !eventsRes.error && !obsRes.error) {
         const remoteRoutes = routesRes.data.map((r: any) => ({
@@ -107,6 +128,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }))
 
         setState((prev) => {
+          if (shouldUploadLocalCatalog && prev.catalog && prev.catalog.length > 0) {
+            const upsertData = prev.catalog.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              icon_name: c.iconName,
+              custom_icon_url: c.customIconUrl || null,
+              category: c.category || null,
+              description: c.description || null,
+              base_weight: c.baseWeight,
+              road_contexts: c.roadContexts || (c.roadContext ? [c.roadContext] : ['rodoviaria']),
+            }))
+            supabase
+              .from('risk_catalog' as any)
+              .upsert(upsertData)
+              .then()
+          }
+
           const merge = (local: any[], remote: any[]) => {
             const localMap = new Map(local.map((i) => [i.id, i]))
             remote.forEach((r) => {
@@ -121,6 +159,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             segments: merge(prev.segments, remoteSegments),
             events: merge(prev.events, remoteEvents),
             observations: merge(prev.observations || [], remoteObs),
+            catalog: remoteCatalog ? remoteCatalog : prev.catalog,
           }
         })
       }
@@ -137,6 +176,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useRealtime('segments', fetchRemoteData, !!user)
   useRealtime('events', fetchRemoteData, !!user)
   useRealtime('observations', fetchRemoteData, !!user)
+  useRealtime('risk_catalog', fetchRemoteData, !!user)
 
   useEffect(() => {
     localStorage.setItem('rotograma_state', JSON.stringify(state))
@@ -195,17 +235,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateCatalog = (catalog: RiskType[]) => {
     setState((prev) => ({ ...prev, catalog }))
+    if (user) {
+      const upsertData = catalog.map((c) => ({
+        id: c.id,
+        name: c.name,
+        icon_name: c.iconName,
+        custom_icon_url: c.customIconUrl || null,
+        category: c.category || null,
+        description: c.description || null,
+        base_weight: c.baseWeight,
+        road_contexts: c.roadContexts || (c.roadContext ? [c.roadContext] : ['rodoviaria']),
+      }))
+      supabase
+        .from('risk_catalog' as any)
+        .upsert(upsertData)
+        .then()
+    }
   }
 
   const addCatalogRisk = (risk: RiskType) => {
     setState((prev) => ({ ...prev, catalog: [...prev.catalog, risk] }))
+    if (user) {
+      supabase
+        .from('risk_catalog' as any)
+        .insert({
+          id: risk.id,
+          name: risk.name,
+          icon_name: risk.iconName,
+          custom_icon_url: risk.customIconUrl || null,
+          category: risk.category || null,
+          description: risk.description || null,
+          base_weight: risk.baseWeight,
+          road_contexts:
+            risk.roadContexts || (risk.roadContext ? [risk.roadContext] : ['rodoviaria']),
+        })
+        .then()
+    }
   }
 
   const updateCatalogRisk = (id: string, updates: Partial<RiskType>) => {
-    setState((prev) => ({
-      ...prev,
-      catalog: prev.catalog.map((r) => (r.id === id ? { ...r, ...updates } : r)),
-    }))
+    setState((prev) => {
+      const newCatalog = prev.catalog.map((r) => (r.id === id ? { ...r, ...updates } : r))
+
+      if (user) {
+        const updatedRisk = newCatalog.find((r) => r.id === id)
+        if (updatedRisk) {
+          supabase
+            .from('risk_catalog' as any)
+            .update({
+              name: updatedRisk.name,
+              icon_name: updatedRisk.iconName,
+              custom_icon_url: updatedRisk.customIconUrl || null,
+              category: updatedRisk.category || null,
+              description: updatedRisk.description || null,
+              base_weight: updatedRisk.baseWeight,
+              road_contexts:
+                updatedRisk.roadContexts ||
+                (updatedRisk.roadContext ? [updatedRisk.roadContext] : ['rodoviaria']),
+            })
+            .eq('id', id)
+            .then()
+        }
+      }
+      return { ...prev, catalog: newCatalog }
+    })
   }
 
   const removeCatalogRisk = (id: string) => {
@@ -213,6 +306,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
       catalog: prev.catalog.filter((r) => r.id !== id),
     }))
+    if (user) {
+      supabase
+        .from('risk_catalog' as any)
+        .delete()
+        .eq('id', id)
+        .then()
+    }
   }
 
   const addObservation = (observation: Observation) => {
